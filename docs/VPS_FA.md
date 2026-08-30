@@ -36,7 +36,7 @@
 
 ```bash
 cd /opt
-git clone https://github.com/samanbehrooziannasab-hue/trading-wolf-ai.git trading-wolf
+git clone <YOUR_REPOSITORY_URL> trading-wolf
 cd trading-wolf
 bash scripts/install.sh
 curl http://127.0.0.1/health

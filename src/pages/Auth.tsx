@@ -127,7 +127,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
 
       <header className="relative z-10 flex h-16 items-center justify-between px-4 sm:px-8">
         <Link to="/" className="flex items-center gap-2.5">
-          <img src={logo} alt="Trading Wolf AI" className="size-8 rounded-md" />
+          <img src={logo} alt="Trading Wolf AI" className="size-8 rounded-md" referrerPolicy="no-referrer" />
           <span className="text-[15px] font-semibold tracking-tight">Trading Wolf AI</span>
         </Link>
         <div className="flex items-center gap-2">
@@ -140,7 +140,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
         <Card className="w-full max-w-md border-border shadow-xl">
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-xl border border-emerald-400/20 bg-emerald-400/10">
-              <img src={logo} alt="" className="size-12 rounded-lg" />
+              <img src={logo} alt="" className="size-12 rounded-lg" referrerPolicy="no-referrer" />
             </div>
             <CardTitle className="text-xl tracking-tight">{t("auth.title")}</CardTitle>
             <CardDescription>{t("auth.subtitle")}</CardDescription>
@@ -210,19 +210,6 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                   </>
                 )}
               </Button>
-
-              <div className="pt-2 text-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setUsername("wolfadmin");
-                    setPassword("Wolf3010!");
-                  }}
-                  className="text-xs text-muted-foreground transition-colors hover:text-emerald-400"
-                >
-                  {t("auth.demo.hint") || "استفاده از حساب مدیر: wolfadmin / Wolf3010!"}
-                </button>
-              </div>
             </CardContent>
           </form>
 

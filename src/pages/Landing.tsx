@@ -238,7 +238,7 @@ export default function Landing() {
       <header className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4 sm:px-6">
           <Link to="/" className="flex items-center gap-2.5">
-            <img src={logo} alt="Trading Wolf AI" className="size-8 rounded-md"  />
+            <img src={logo} alt="Trading Wolf AI" className="size-8 rounded-md" referrerPolicy="no-referrer" />
             <span className="text-[15px] font-semibold tracking-tight">
               Trading Wolf AI
             </span>
@@ -518,7 +518,7 @@ export default function Landing() {
       <section className="relative overflow-hidden border-t border-border/60">
         <div className="bg-spot pointer-events-none absolute inset-0" />
         <div className="relative mx-auto flex w-full max-w-6xl flex-col items-center px-4 py-24 text-center sm:px-6">
-          <img src={logo} alt="" className="mb-8 size-16 opacity-90 rounded-md"  />
+          <img src={logo} alt="Trading Wolf AI" className="mb-8 size-16 opacity-90 rounded-xl" referrerPolicy="no-referrer" />
           <h2 className="max-w-2xl text-3xl font-bold tracking-tight sm:text-4xl">
             {t("cta.title")}
           </h2>
@@ -586,7 +586,7 @@ export default function Landing() {
       <footer className="border-t border-border/60">
         <div className="mx-auto flex w-full max-w-6xl flex-col items-center justify-between gap-4 px-4 py-8 sm:flex-row sm:px-6">
           <div className="flex items-center gap-2.5">
-            <img src={logo} alt="" className="size-7 rounded-md"  />
+            <img src={logo} alt="Trading Wolf AI" className="size-7 rounded-md" referrerPolicy="no-referrer" />
             <span className="text-sm font-semibold">Trading Wolf AI</span>
             <span className="terminal-font text-xs text-emerald-400">v1.3.0</span>
           </div>

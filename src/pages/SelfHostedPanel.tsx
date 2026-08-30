@@ -651,7 +651,7 @@ export default function SelfHostedPanel() {
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-2.5">
           <div className="flex items-center gap-2.5">
             <span className="grid size-9 place-items-center overflow-hidden rounded-full border border-emerald-400/30 bg-emerald-400/10">
-              <img src={logo} alt="Trading Wolf AI" className="size-7 rounded-full object-cover" />
+              <img src={logo} alt="Trading Wolf AI" className="size-7 rounded-full object-cover" referrerPolicy="no-referrer" />
             </span>
             <span className="leading-tight">
               <span className="block text-sm font-black tracking-tight">Trading Wolf AI</span>

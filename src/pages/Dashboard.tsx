@@ -1849,7 +1849,9 @@ function UserPanel({ token }: { token: string }) {
   const vip = account?.vip;
   const daysLeft = vip?.daysLeft ?? 0;
   const hasActiveVip = Boolean(vip?.active);
-  const floating = positions?.reduce((sum: number, p: any) => sum + (p.pnl ?? 0), 0) ?? 0;
+  const userFloating = frozen > 0 ? (account?.share?.floatingPnl ?? 0) : 0;
+  const userRealized = frozen > 0 ? (account?.share?.realizedPnl ?? 0) : 0;
+  const floating = userFloating;
   const tomanRate = coins?.settings?.usdtTomanRate ?? 95000;
   const tomanPerCoin = coins?.settings?.tomanPerCoin ?? 5000;
   const monthlyBurn = coins?.settings?.monthlyBurn ?? 43200;
@@ -2654,8 +2656,9 @@ function UserPanel({ token }: { token: string }) {
                 </div>
                 <div className="rounded-md border border-border/50 bg-background/40 p-3">
                   <p className="text-[11px] text-muted-foreground">{s.personalPnl}</p>
-                  <p className={`mt-1.5 text-lg font-bold tabular-nums ${floating >= 0 ? "text-emerald-300" : "text-red-300"}`}>{pnlText(floating)}</p>
-                  <p className="text-[10px] text-muted-foreground">{s.realizedPnl}: <span className={`terminal-font ${(ea?.realizedPnl ?? 0) >= 0 ? "text-emerald-300" : "text-red-300"}`}>{pnlText(ea?.realizedPnl ?? 0)}</span></p>
+                  <p className={`mt-1.5 text-lg font-bold tabular-nums ${userFloating >= 0 ? "text-emerald-300" : "text-red-300"}`}>{pnlText(userFloating)}</p>
+                  <p className="text-[10px] text-muted-foreground">{s.realizedPnl}: <span className={`terminal-font ${userRealized >= 0 ? "text-emerald-300" : "text-red-300"}`}>{pnlText(userRealized)}</span></p>
+                  {frozen <= 0 && <p className="mt-1 text-[9px] text-amber-400/80">{lang === "fa" ? "سرمایه فریز نشده (سود/زیان غیرفعال)" : "No capital frozen (P&L inactive)"}</p>}
                 </div>
                 <div className="rounded-md border border-border/50 bg-background/40 p-3">
                   <p className="text-[11px] text-muted-foreground">{s.subscription}</p>
@@ -2894,21 +2897,22 @@ function UserPanel({ token }: { token: string }) {
             <Card className="bg-card/60">
               <CardContent className="p-4">
                 <p className="text-xs text-muted-foreground">{s.portfolio}</p>
-                <p className="mt-1.5 text-xl font-bold tracking-tight tabular-nums">{money((wallet?.balance ?? 0) + floating)}</p>
-                <p className="mt-1 text-[11px] text-muted-foreground">{s.floating}: {pnlText(floating)}</p>
+                <p className="mt-1.5 text-xl font-bold tracking-tight tabular-nums">{money((wallet?.balance ?? 0) + userFloating)}</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">{s.floating}: {pnlText(userFloating)}</p>
+                {frozen <= 0 && <p className="mt-0.5 text-[9px] text-amber-400/80">{lang === "fa" ? "سرمایه فریز نشده" : "No capital frozen"}</p>}
               </CardContent>
             </Card>
             <Card className="bg-card/60">
               <CardContent className="p-4">
                 <p className="text-xs text-muted-foreground">{s.positionsOpen}</p>
-                <p className="mt-1.5 text-xl font-bold tracking-tight tabular-nums">{positions?.length ?? 0}</p>
+                <p className="mt-1.5 text-xl font-bold tracking-tight tabular-nums">{frozen > 0 ? (positions?.length ?? 0) : 0}</p>
                 <p className="mt-1 text-[11px] text-muted-foreground">{overview ? `${overview.signals.open} ${s.openSignals}` : ""}</p>
               </CardContent>
             </Card>
             <Card className="bg-card/60">
               <CardContent className="p-4">
                 <p className="text-xs text-muted-foreground">{s.realizedPnl}</p>
-                <p className={`mt-1.5 text-xl font-bold tracking-tight tabular-nums ${(ea?.realizedPnl ?? 0) >= 0 ? "text-emerald-300" : "text-red-300"}`}>{pnlText(ea?.realizedPnl ?? 0)}</p>
+                <p className={`mt-1.5 text-xl font-bold tracking-tight tabular-nums ${userRealized >= 0 ? "text-emerald-300" : "text-red-300"}`}>{pnlText(userRealized)}</p>
                 <p className="mt-1 text-[11px] text-muted-foreground">{lang === "fa" ? "سود/زیان محقق‌شده" : "closed trades"}</p>
               </CardContent>
             </Card>
@@ -7165,7 +7169,7 @@ export default function Dashboard() {
       <header className="sticky top-0 z-20 border-b border-border/60 bg-background/85 backdrop-blur">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 sm:px-6">
           <Link to="/" className="flex items-center gap-2.5">
-            <img src={logo} alt="Trading Wolf AI" className="size-8 rounded-md"  />
+            <img src={logo} alt="Trading Wolf AI" className="size-8 rounded-md" referrerPolicy="no-referrer" />
             <div className="leading-tight">
               <p className="text-sm font-bold tracking-tight">Trading Wolf AI</p>
               <p className="terminal-font text-[10px] text-muted-foreground">{isAdmin ? s.roleAdmin : isAssistant ? (lang === "fa" ? "ناظر (پشتیبانی)" : "Monitor") : s.roleUser} · {user?.tgUsername ? `@${user.tgUsername}` : user?.username ?? ""}</p>

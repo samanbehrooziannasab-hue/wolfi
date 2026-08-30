@@ -15,7 +15,7 @@ export default function NotFound() {
       <div className="bg-market-grid pointer-events-none absolute inset-0" />
 
       <div className="relative flex flex-1 flex-col items-center justify-center px-4 text-center">
-        <img src={logo} alt="" className="mb-6 size-14 opacity-90 rounded-md"  />
+        <img src={logo} alt="Trading Wolf AI" className="mb-6 size-14 opacity-90 rounded-md" referrerPolicy="no-referrer" />
         <p className="terminal-font mb-2 text-[11px] uppercase tracking-[0.25em] text-emerald-400">
           system · 404
         </p>

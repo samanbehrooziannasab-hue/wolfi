@@ -5,6 +5,9 @@
 # 2. Serves the frontend with Vite bound to 0.0.0.0.
 set -u
 
+export CONVEX_TMPDIR=/tmp/convex
+mkdir -p /tmp/convex
+
 if ! curl -s -m 2 -o /dev/null http://127.0.0.1:3210/ 2>/dev/null && \
    ! curl -s -m 2 -o /dev/null https://127.0.0.1:3210/ 2>/dev/null; then
   # The local Convex sandbox (`.convex/local`) can be left with an unfinished

@@ -1,246 +1,190 @@
-# 🐺 Trading Wolf AI
+# 🐺 Trading Wolf AI — سیستم جامع تحلیل، معاملات هوشمند و مینی‌اپ تلگرام
 
-**موتور معاملاتی و مانیتورینگ خودکار بر پایه USDT** با پنل وب، مینی‌اپ تلگرام، تحلیل چنداستراتژی و اتصال چندگانه به AI.
-
-A **USDT-based trading and monitoring engine** with a web panel, Telegram Mini App, multi-strategy analysis, live charts, and pluggable AI providers.
-
-> ⚠️ این پروژه ابزار خصوصی است و توصیه مالی نیست. در حالت Live، سفارش واقعی فقط بعد از تنظیم صریح کلید صرافی و فعال‌سازی Live Trading انجام می‌شود.
-
-**نسخه فعلی: ۱.۳.۰** — داده‌ی بازار کاملاً واقعی (بدون کندل مصنوعی)، اقتصاد سکه و کیف پول تومانی، موتور ۲۴/۷ با بک‌تست و مدل هزینه کارمزد/اسلیپیج.
+پلتفرم پیشرفته و هوشمند معاملات الگوریتمی (کریپتو و فارکس) مبتنی بر تتر (USDT)، با تحلیل تکنیکال بیش از ۱۰۰ استراتژی هم‌زمان، مینی‌اپ و ربات تلگرام، مدیریت سرمایه و سود/زیان واقعی، سیستم پاداش و رفرال، و پنل مدیریت کامل.
 
 ---
 
-## 🏗 دو بک‌اند / Two runtimes (پاسخ به «با Convex یا بدون Convex؟»)
-
-این ریپو **دو بک‌اند مستقل** دارد و هر دو در گیت‌هاب ذکر شده‌اند:
-
-| حالت | بک‌اند | فرانت‌اند | نیاز به Convex؟ | وضعیت |
-|---|---|---|---|---|
-| **فعلی / پیش‌نمایش** | `src/convex/` (موتور، مارکت، ادمین، تلگرام، AI) | React + کلاینت Convex | ✅ **بله** — همین حالا روی Convex اجرا می‌شود | فعال (همین چیزی که سایت و مینی‌اپ الان استفاده می‌کنند) |
-| **خود-میزبان / سرور (VPS)** | `server/` (Hono + PostgreSQL + Redis — موتور، صرافی‌ها، تلگرام، AI) | **پنل REST مخصوص** (`SelfHostedPanel`) برای هسته‌ی کاربر + ادمین‌لایت | ✅ **هیچ‌کجا Convex نیست** — لاگین، بازار، سیگنال، کیف پول، VIP، پشتیبانی، پروفایل | بک‌اند و پنل آماده‌ی deploy؛ انتقال بقیه‌ی بخش‌های پیشرفته‌ی داشبورد Convex به REST فازبندی‌شده |
-
-> ⚠️ **پس چرا گیت‌هاب می‌گوید «با Convex کار می‌کند»؟** چون دو حالت ساخت جداگانه داریم:
-> `VITE_BACKEND=convex` (پیش‌فرض — همان چیزی که الان روی Freebuff/Convex اجرا می‌شود) و
-> `VITE_BACKEND=rest` (سرور خودتان — **بدون Convex**). در حالت rest، پنل مخصوص REST
-> (`SelfHostedPanel`) با بک‌اند `server/` کار می‌کند و لاگین و هسته‌ی داشبورد بدون هیچ
-> Convex بالا می‌آید؛ بخش‌های پیشرفته‌ی داشبورد Convex به‌صورت فازبندی به REST منتقل می‌شوند
-> (نقشه: [docs/MIGRATE_FROM_CONVEX.md](docs/MIGRATE_FROM_CONVEX.md)).
+## 📖 فهرست مطالب (Quick Navigation)
+1. [ویژگی‌های کلیدی سیستم](#-ویژگیهای-کلیدی-سیستم)
+2. [آموزش نصب قدم‌به‌قدم روی سرور خام (برای مبتدی‌ها از ۰ تا ۱۰۰)](#-آموزش-نصب-قدمبهقدم-روی-سرور-خام-vps)
+3. [تنظیمات ربات، دامنه و متغیرهای محیطی](#-تنظیمات-ربات-دامنه-و-کلیدها)
+4. [آموزش بروزرسانی پروژه بدون از دست رفتن اطلاعات](#-نحوه-بروزرسانی-پروژه-update)
+5. [ورود پیش‌فرض به پنل مدیریت](#-ورود-به-پنل-مدیریت)
+6. [نحوه عملکرد سود و زیان (PnL) کاربران](#-محاسبه-سود-و-زیان-pnl-بر-اساس-سرمایه-فریز-شده)
+7. [توسعه محلی و پیش‌نمایش](#-توسعه-محلی-local-development)
 
 ---
 
-## امکانات / Features
+## ✨ ویژگی‌های کلیدی سیستم
 
-**موتور معاملاتی (Trading Engine)**
-- اسکن ۲۴/۷ چندتایم‌فریم (۱۵m/۱h) روی همه بازارهای فعال با داده واقعی (Binance برای کریپتو، Yahoo برای فارکس/فلزات)
-- بیش از ۱۰۰ استراتژی واقعی با ایوالویتور (نه فقط نام) در خانواده‌های Price Action / Trend / Momentum / SMC / ICT / Volume و…
-- امتیاز ۰ تا ۱۰۰ + تشخیص تعارض استراتژی‌ها + دروازه کیفیت داده (داده قدیمی = بدون معامله)
-- جلوگیری قطعی از دو پوزیشن هم‌زمان روی یک نماد (حتی Long و Short مخالف)
-- مدل هزینه واقعی: کارمزد پلتفرم + اسلیپیج هنگام باز و بست — سود/زیان خالص
-- بک‌تست موتور روی کندل‌های واقعی ذخیره‌شده (گزارش نرخ برد، Profit Factor، بهترین استراتژی‌ها)
-- ریسک قابل تنظیم: حداقل امتیاز ورود (پیش‌فرض ۸۰)، ریسک هر معامله، سقف ضرر روزانه، سقف معاملات روزانه، اهرم، DCA و…
-- مانیتورینگ پوزیشن باز، SL/TP/تریلینگ، ثبت سود/زیان محقق‌شده و یادگیری برای هر معامله
+* **موتور معاملاتی ۲۴/۷ هوشمند:**
+  * تحلیل زنده بیش از ۶۰ بازار کریپتو و فارکس با داده‌های واقعی (Binance و Yahoo Finance).
+  * بیش از ۱۰۰ استراتژی فعال در دسته‌های Price Action، ICT، Smart Money Concepts (SMC)، Trend و Momentum.
+  * سیستم امتیازدهی چندگانه (Confluence Scoring) و فیلتر سیگنال‌های متناقض.
+  * مدیریت ریسک پویا: حد ضرر (SL)، حد سود (TP پلکانی)، تریلینگ استاپ و جلوگیری از معامله هم‌زمان متضاد.
 
-**بازارها**
-- ۳۵ جفت کریپتو (۲۵ ارز برتر + ۱۰ میم‌کوین محبوب) و ۳۰ نماد فارکس/فلزات (ماژورها + کراس‌ها + طلا/نقره)
-- جداسازی کامل کریپتو/فارکس، فعال/غیرفعال‌سازی هر نماد از پنل مدیر
+* **محاسبه عادلانه و دقیق سود و زیان (PnL):**
+  * سود و زیان کاربران دقیقاً بر اساس سرمایه فریز شده (درگیر شده در موتور) محاسبه می‌شود.
+  * کاربری که سرمایه‌ای درگیر نکرده باشد، PnL او صفر بوده و در معرض ریسک قرار نمی‌گیرد.
+  * تسهیم سود و کسر کارمزد پلتفرم بر اساس سطح اشتراک VIP.
 
-**کیف پول و اقتصاد سکه**
-- سه موجودی مجزا: **USDT** (با شبکه TRC20/ERC20/BEP20/TON و فریز برای موتور)، **تومان** (شارژ کارت‌به‌کارت، خرید اشتراک و سکه)، **ولف‌کوین** (پاداش تسک، دعوت، بازی و پرداخت امکانات)
-- نرخ تتر به تومان، قیمت سکه، بسته‌های سکه، کد ووچر، کسر سکه ساعتی (پیش‌فرض ۶۰) — همه از پنل مدیر
-- دفتر سکه و تاریخچه یکپارچه کیف پول با تاریخ شمسی/میلادی
+* **مینی‌اپ و ربات تلگرام دو زبانه (فارسی / انگلیسی):**
+  * ورود امن با Telegram WebApp.
+  * بررسی خودکار عضویت در کانال‌های فارسی و انگلیسی.
+  * ارسال آنی سیگنال‌ها، باز شدن و بسته شدن معاملات با کارت‌های زیبا در کانال و ربات.
 
-**تلگرام**
-- ربات سبک فقط نقش Bridge: عضویت کانال، شماره تماس، ورود مینی‌اپ، اعلان‌ها
-- دو زبانه (فارسی/انگلیسی) با `/lang`، ارسال پیام از پنل مدیر به کاربر یا کانال
-- اطلاع‌رسانی خودکار درخواست‌های واریز/برداشت/اشتراک و خطاهای موتور به ایدی مدیر
-
-**کاربر و مدیریت**
-- پنل کاربر ریسپانسیو با داشبورد، پروفایل، کیف پول، تیکتینگ (شناسه #T-xxxxx)، آموزش، بازی حدس کندل و هوش مصنوعی
-- پنل مدیریت کامل: Overview / Engine / Users / VIP / Wallets / Positions / Markets / Strategies / AI / Exchanges / Notifications / Support / Referral / Learning / Reports / Logs / Settings
-- پکیج‌های VIP با تخفیف، سکه هدیه، کارمزد از سود و مدت چندماهه؛ ۴۸ ساعت اشتراک رایگان برای کاربر جدید (قابل تنظیم)
-- ورود با username/password، امنیت: Argon2id، سشن امن، RBAC، لاگ حسابرسی، رمزنگاری کلیدها
+* **سیستم کیف پول و اقتصاد داخلی:**
+  * موجودی USDT (با شبکه‌های TRC20 / BEP20 / TON).
+  * کیف پول تومانی (کارت به کارت جهت خرید بسته‌های VIP و خدمات).
+  * سیستم ولف‌کوین (Wolf Coins) جهت پاداش ثبت‌نام، دعوت دوستان (Referral) و تسک‌ها.
 
 ---
 
+## 🚀 آموزش نصب قدم‌به‌قدم روی سرور خام (VPS)
+
+این آموزش به گونه‌ای نوشته شده است که هر کسی، حتی برای بار اول، بتواند به سادگی پروژه را روی یک سرور خام لینوکس (اوبونتو ۲۲.۰۴ یا ۲۴.۰۴) راه‌اندازی کند.
+
+### 📋 پیش‌نیازهای اولیه:
+1. **یک سرور مجازی (VPS):** با سیستم‌عامل Ubuntu 22.04 یا 24.04 (حداقل ۲ گیگابایت رم).
+2. **یک دامنه:** متصل شده به آی‌پی سرور (مثلاً `wolf.yourdomain.com`).
+3. **توکن ربات تلگرام:** دریافتی از [@BotFather](https://t.me/BotFather).
+
 ---
 
-## ورود پیش‌فرض / Default admin login
-
-```text
-Username: wolfadmin
-Password: Wolf3010!
+### مرحله ۱: اتصال به سرور از طریق SSH
+ترمینال کامپیوتر خود (یا برنامه PuTTY در ویندوز) را باز کنید و دستور زیر را بنویسید (به جای `1.2.3.4` آی‌پی سرور خود را بگذارید):
+```bash
+ssh root@1.2.3.4
 ```
-
-بعد از اولین ورود رمز را از **پنل مدیر → کاربران** تغییر دهید.
-Change the password from **Admin → Users** immediately after the first login.
+رمز سرور را وارد کرده و Enter بزنید.
 
 ---
 
-## تنظیمات و کلیدها / Configuration
-
-تنظیمات اصلی seed در این فایل قرار دارد:
-
-```text
-src/convex/constants.ts
-```
-
-اما برای محیط واقعی، کلیدها را داخل سورس commit نکنید. کلیدهای زیر را از تب **Keys / API keys** یا Secret Manager سرور وارد کنید:
-
-```text
-GEMINI_API_KEY
-OPENAI_API_KEY
-ANTHROPIC_API_KEY
-OPENROUTER_API_KEY
-GROQ_API_KEY
-CEREBRAS_API_KEY
-MISTRAL_API_KEY
-TELEGRAM_BOT_TOKEN
-VITE_CONVEX_URL
-```
-
-در پنل مدیر بخش‌ها قابل تنظیم هستند؛ تب **اتصالات و کلیدها / Connections** (زیرگروه تنظیمات) همه‌ی مقادیر قابل تزریق را یکجا دارد:
-
-- Telegram bot token، bot username، owner/assistant numeric ID، وبهوک URL + secret، لینک Mini App
-- کانال فارسی: numeric ID، username، invite link، عضویت اجباری
-- کانال انگلیسی (دو زبانه): همان مقادیر با کلیدهای `channel.enId` / `channel.enUsername` / `channel.enInviteLink` — اعلان‌ها و کارت‌های معاملات به هر دو کانال ارسال می‌شوند
-- دیتابیس: host، port، name، user و password
-- دامنه سایت و آی‌پی سرور
-- AI provider، model و key اول و دوم
-- نرخ USDT و شبکه‌ی پیش‌فرض
-- سرمایه موتور، ریسک هر معامله، leverage، حداقل score و confidence
-- Spot/Futures، حالت Live/Paper، autonomous engine
-- API حساب صرافی/بروکر و محیط Demo/Live
-
-**رمزنگاری در حالت ذخیره (Encrypted at rest):** توکن ربات، secret وبهوک، کلیدهای AI و رمز دیتابیس با AES-GCM و کلید `system.encryptionKey` رمزنگاری می‌شوند و در خروجی فقط نسخه‌ی mask دیده می‌شود — حتی اگر دیتابیس لو برود، متن واقعی کلیدها قابل خواندن نیست. کلیدهای صرافی نیز در جدول `exchangeAccounts` با AES-GCM رمزنگاری می‌شوند.
-
-**تست تلگرام:** در تب اتصالات دکمه‌های «تست اتصال ربات» (getMe + پیام تست به مدیر)، «تست ارسال به کانال‌ها» (هر دو کانال fa/en) و «اتصال وبهوک» (setWebhook روی `<deployment>/telegram/webhook`) وجود دارد؛ سپس از طریق «باز کردن ربات» و ارسال `/start`، ورود با تلگرام (دکمه‌ی Mini App) قابل تست است.
-
----
-
-## نصب سریع / Quick install
-
-### 🖥 نصب روی سرور خام (مسیر Server / REST بدون Convex)
-
-**مسیر سرور مستقل:** بک‌اند کامل (PostgreSQL + Redis + API + موتور + تلگرام)
-روی یک سرور اجرا می‌شود و build فرانت‌اند با `VITE_BACKEND=rest` به همین API وصل
-می‌شود؛ Convex فقط برای مسیر پیش‌نمایش استفاده می‌شود و در این مسیر لازم نیست.
-
-روی یک VPS خام (Ubuntu 22.04/24.04)، فقط این ۳ دستور:
+### مرحله ۲: نصب پیش‌نیازها و دانلود پروژه
+دستورات زیر را به ترتیب در ترمینال کپی و اجرا کنید:
 
 ```bash
-sudo apt-get update && sudo apt-get install -y git
-cd /opt && git clone <YOUR_REPOSITORY_URL> trading-wolf && cd trading-wolf
+# ۱. آپدیت مخازن سرور
+sudo apt update && sudo apt upgrade -y
+
+# ۲. نصب گیت و ابزارهای لازم
+sudo apt install -y git curl wget unzip
+
+# ۳. رفتن به مسیر نصب و دریافت پروژه
+cd /opt
+git clone <آدرس_مخزن_گیت‌هاب_شما> trading-wolf
+cd /opt/trading-wolf
+```
+
+---
+
+### مرحله ۳: اجرای اسکریپت نصب خودکار
+اسکریپت هوشمند تمام پیش‌نیازها (Node.js, PostgreSQL, Redis, Nginx و ساخت فایل‌های کانفیگ) را خودکار انجام می‌دهد:
+
+```bash
 bash scripts/install.sh
 ```
 
-اسکریپت همه‌چیز را خودش انجام می‌دهد: پیش‌نیازها (Node/Bun + PostgreSQL +
-Redis)، ساخت `.env` با رمزهای تصادفی امن، build فرانت‌اند و بک‌اند، migration
-و seed دیتابیس و بالا آوردن سرویس‌ها. `deploy/env.example` حالا شامل
-`VITE_BACKEND=rest` است — یعنی فرانت‌اند به‌صورت خودکار در حالت **بدون Convex**
-build می‌شود و با پنل REST کار می‌کند. بعد فقط `nano .env` را باز کنید، توکن
-ربات تلگرام و آیدی کانال را وارد کنید و `bash scripts/update.sh` بزنید.
+---
 
-راهنمای کامل قدم‌به‌قدم فارسی: **[docs/VPS_FA.md](docs/VPS_FA.md)** ·
-English: **[docs/VPS_EN.md](docs/VPS_EN.md)** · مرجع دستورها: **[docs/DEPLOY.md](docs/DEPLOY.md)**
-
-### 🔄 بروزرسانی پروژه (وقتی پروژه قبلاً روی سرور است)
-
-یک دستور، بدون بهم‌ریختن زیرساخت و تنظیمات:
+### مرحله ۴: تنظیم توکن ربات و دامنه
+فایل تنظیمات محیطی سرور را باز کنید:
 
 ```bash
-cd /opt/trading-wolf   # پوشه‌ی پروژه‌ی نصب‌شده
+nano .env
+```
+
+مقادیر زیر را با مشخصات دلخواه خود پر کنید:
+* `APP_DOMAIN`: دامنه شما (مثلاً `wolf.yourdomain.com`)
+* `TELEGRAM_BOT_TOKEN`: توکن ربات تلگرام شما
+* `TELEGRAM_BOT_USERNAME`: نام کاربری ربات شما (بدون @)
+* `TELEGRAM_ADMIN_ID`: آیدی عددی تلگرام مدیر (جهت دریافت اعلان‌ها)
+* `TELEGRAM_CHANNEL_ID`: آیدی عددی کانال سیگنال‌ها (مثلاً `-1001234567890`)
+* `TELEGRAM_CHANNEL_USERNAME`: آیدی کانال تلگرام شما
+
+برای ذخیره فایل در `nano`:
+دکمه **Ctrl + O** را بزنید، سپس **Enter**، و بعد **Ctrl + X** برای خروج.
+
+---
+
+### مرحله ۵: اعمال تنظیمات و راه‌اندازی نهایی
+پس از ویرایش فایل `.env`، دستور بروزرسانی را اجرا کنید تا سرویس‌ها ری‌استارت شده و بالا بیایند:
+
+```bash
 bash scripts/update.sh
 ```
 
-بکاپ دیتابیس → git pull → نصب وابستگی‌ها → build → migration → ری‌استارت.
-هرگز `.env`، داده‌ها و پیش‌نیازها را دست نمی‌زند.
-
-### ⚙️ توسعه‌ی محلی (پیش‌نمایش — Convex)
-
-```bash
-bun install
-bun convex dev --once
-bun run dev
-```
-
-برای typecheck:
-
-```bash
-bun convex dev --once && bun tsc -b --noEmit
-```
-
-> **وضعیت مهاجرت از Convex:** بک‌اند کامل خود-میزبان (`server/`) آماده و
-> قابل deploy است؛ فرانت‌اند هنوز روی کلاینت Convex است و به‌صورت فازبندی به
-> REST منتقل می‌شود — نقشه‌ی کامل: **[docs/MIGRATE_FROM_CONVEX.md](docs/MIGRATE_FROM_CONVEX.md)**
-> دلیل: محدودیت پلن رایگان Convex دیپلوی را غیرفعال کرد؛ روی سرور خودتان چنین
-> محدودیتی وجود ندارد.
+اکنون سایت شما روی دامنه بالا آمده و ربات تلگرام آماده پاسخ‌گویی است! 🎉
 
 ---
 
-## ساختار / Structure
+## 🔄 نحوه بروزرسانی پروژه (Update)
+
+هر زمان که تغییراتی در سورس کد داده شد یا نسخه جدیدی عرضه شد، تنها کافیست دستور زیر را در سرور اجرا کنید:
+
+```bash
+cd /opt/trading-wolf
+bash scripts/update.sh
+```
+
+این دستور به صورت خودکار و امن:
+1. از دیتابیس بکاپ می‌گیرد.
+2. آخرین تغییرات کد را دریافت می‌کند.
+3. پکیج‌ها را نصب و پروژه را بیلد مجدد می‌کند.
+4. بدون دست زدن به تنظیمات شما (`.env`) سرور را ری‌استارت می‌کند.
+
+---
+
+## 🔑 ورود به پنل مدیریت
+
+جهت دسترسی به داشبورد و کنترل تمام بخش‌های سیستم:
+
+* **آدرس پنل:** `https://your-domain.com` (یا از طریق مینی‌اپ در ربات تلگرام)
+* **نام کاربری پیش‌فرض:** `wolfadmin`
+* **رمز عبور پیش‌فرض:** `Wolf3010!`
+
+> ⚠️ **نکته امنیتی بسیار مهم:** بلافاصله پس از اولین ورود، از منوی **مدیریت → کاربران**، رمز عبور حساب مدیر را تغییر دهید.
+
+---
+
+## 💰 محاسبه سود و زیان (PnL) بر اساس سرمایه فریز شده
+
+* **اصل شفافیت و امنیت کاربر:**
+  کاربران تنها به میزان سرمایه‌ای که در کیف پول خود به عنوان «سرمایه درگیر/فریز شده در موتور» مشخص می‌کنند، در معاملات و سود/زیان سهیم می‌شوند.
+* اگر کاربری سرمایه‌ای فریز نکرده باشد، ارزش دارایی او برابر موجودی خالص کیف پولش باقی می‌ماند و PnL او برابر صفر نمایش داده می‌شود.
+* درصد سهم پلتفرم از سود معاملات بر اساس سطح اشتراک VIP کاربر (عادی: ۵۰٪، برنز: ۳۰٪، نقره‌ای: ۱۵٪، طلایی/پلاتینیوم: ۱۰٪) به صورت خودکار محاسبه و کسر می‌گردد.
+
+---
+
+## 🛠 توسعه محلی (Local Development)
+
+برای توسعه‌دهندگان و تست در محیط لوکال:
+
+```bash
+# نصب وابستگی‌ها
+npm install
+
+# اجرای محیط توسعه
+npm run dev
+```
+
+---
+
+## 📄 ساختار فایل‌های پروژه
 
 ```text
-src/                      # Frontend (React + Vite — two build modes)
-  lib/backend.ts          #   VITE_BACKEND switch (convex | rest) + REST client
-  pages/                  #   Auth.tsx · Dashboard.tsx (Convex) · SelfHostedPanel.tsx (REST)
-  components/             #   LiveChart.tsx · MarketClock.tsx · RequireAuth.tsx
-  hooks/use-wolf-auth.tsx
-  convex/                 #   schema · engine · strategies · admin · telegram
-
-server/                   # 🚀 Production backend (Node + Hono + PostgreSQL + Redis)
-  src/
-    api.ts                #   REST + WebSocket + Telegram webhook
-    worker.ts             #   engine 24/7 loop (heartbeat + watchdog)
-    engine.ts             #   analysis → risk → execution → monitor → learning
-    exchanges.ts          #   adapter plugins: binance/bybit/okx/bingx/mexc/…
-    ai.ts                 #   AI gateway: gemini/openai/anthropic/openrouter/ollama
-    telegram.ts           #   bot bridge: membership, phone, Mini App, alerts
-    auth.ts               #   argon2id, sessions, RBAC, brute-force lock
-    settings.ts           #   typed settings + risk presets
-    seed.ts               #   admin + 40 markets + 100+ strategies + VIP
-  migrations/*.sql        # ordered, idempotent production migrations
-
-deploy/                   # docker-compose · Dockerfile · nginx.conf · PM2 · backup/restore
-
-docs/                     # VPS_FA.md · VPS_EN.md · DEPLOY.md · SECURITY.md · API.md · TELEGRAM.md · TRADING_ENGINE.md
+├── src/                    # فرانت‌اند ری‌اکت و وب‌اپلیکیشن
+│   ├── pages/             # صفحات اصلی (Auth, Dashboard, SelfHostedPanel)
+│   ├── components/        # کامپوننت‌های رابط کاربری، چارت زنده و ساعت بازار
+│   ├── convex/            # بک‌اند، توابع موتور، استراتژی‌ها، احراز هویت و APIها
+│   └── assets/            # وکتورها و لوگوی اختصاصی پروژه
+├── server/                # بک‌اند مستقل سلف‌هاست (Node.js + Hono + PostgreSQL)
+├── deploy/                # کانفیگ‌های Nginx، داکر و فایل‌های دیپلوی
+├── scripts/               # اسکریپت‌های نصب خودکار و آپدیت (install.sh & update.sh)
+└── docs/                  # مستندات تکمیلی و راهنماهای فنی
 ```
 
 ---
 
-## مستندات / Documentation
-
-| سند | توضیح |
-|---|---|
-| [VPS_FA.md](docs/VPS_FA.md) | نصب قدم‌به‌قدم فارسی روی سرور (مبتدی‌پسند) |
-| [VPS_EN.md](docs/VPS_EN.md) | English deployment guide |
-| [DEPLOY.md](docs/DEPLOY.md) | دستورهای install/build/migrate/seed/start/stop/restart/logs/backup/restore/health |
-| [SECURITY.md](docs/SECURITY.md) | مدل امنیتی، audit، hardening |
-| [API.md](docs/API.md) | فهرست کامل APIها |
-| [TELEGRAM.md](docs/TELEGRAM.md) | راه‌اندازی ربات، webhook و Mini App |
-| [TRADING_ENGINE.md](docs/TRADING_ENGINE.md) | معماری موتور، قوانین سخت و ریسک |
-| [CHANGELOG.md](CHANGELOG.md) | تغییرات نسخه‌ها |
-
----
-
-## Telegram deployment note
-
-ربات باید روی webhook عمومی Telegram قرار بگیرد و این مراحل را انجام دهد:
-
-1. دریافت `/start`
-2. درخواست Contact و ثبت phone number
-3. بررسی عضویت در کانال با `telegramChatMember`
-4. ساخت session از طریق `tgLogin`
-5. ارسال دکمه Mini App
-6. ارسال signal، trade-open و trade-close با reply به پیام اصلی
-
-The Telegram bot must run behind a public HTTPS webhook. In the current (Convex)
-stack the Mini App uses the same Convex deployment; in the self-hosted (`server/`)
-stack the webhook is `https://<your-domain>/telegram/webhook` proxied to the API.
-
----
-
-## Disclaimer
-
-معاملات اهرمی و اتصال API صرافی می‌تواند باعث از دست رفتن کل سرمایه شود. ابتدا با Paper/Demo و سرمایه محدود تست کنید.
-
-Leveraged trading and exchange API access can result in total loss. Test with Paper/Demo mode and limited capital first.
+## ⚠️ سلب مسئولیت (Disclaimer)
+معاملات در بازارهای مالی کریپتو و فارکس دارای ریسک ذاتی است. همواره ابتدا در محیط دمو (Paper Trading) استراتژی‌های خود را بسنجید و با مدیریت ریسک مناسب فعالیت نمایید.
