@@ -10,7 +10,7 @@
 import { v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { requireAdmin, requireStaff, resolveWolfUser } from "./wolfAuth";
+import { requireAdmin, requireStaff, resolveAdmin, resolveStaff, resolveWolfUser } from "./wolfAuth";
 import { getSetting, getSettingsMap } from "./settings";
 import { audit, log } from "./logs";
 
@@ -171,7 +171,8 @@ export const myCoins = query({
 export const listVouchers = query({
   args: { token: v.string() },
   handler: async (ctx, { token }) => {
-    await requireStaff(ctx, token);
+    const staff = await resolveStaff(ctx, token);
+    if (!staff) return [];
     const rows = await ctx.db.query("voucherCodes").order("desc").take(100);
     const users = await ctx.db.query("users").collect();
     const byId = new Map<string, any>();
@@ -193,7 +194,8 @@ export const listVouchers = query({
 export const listCoinTransactions = query({
   args: { token: v.string(), userId: v.optional(v.id("users")), limit: v.optional(v.number()) },
   handler: async (ctx, { token, userId, limit }) => {
-    await requireStaff(ctx, token);
+    const staff = await resolveStaff(ctx, token);
+    if (!staff) return [];
     let rows = await ctx.db.query("coinTransactions").order("desc").take(limit ?? 100);
     if (userId) rows = rows.filter((r) => r.userId === userId);
     const users = await ctx.db.query("users").collect();

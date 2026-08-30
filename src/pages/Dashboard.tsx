@@ -5,6 +5,8 @@ import logo from "@/assets/logo.svg";
 import { MarketClock } from "@/components/MarketClock";
 import { SparkChart } from "@/components/SparkChart";
 import { LiveChart } from "@/components/LiveChart";
+import { LiveWinningTicker } from "@/components/LiveWinningTicker";
+import { MultiAgentArena } from "@/components/MultiAgentArena";
 import {
   Badge,
   Button,
@@ -1777,7 +1779,7 @@ function UserPanel({ token }: { token: string }) {
   const connectTelegram = useMutation(api.me.connectTelegram);
   const confirmWithdrawTg = useMutation(api.me.confirmWithdrawTelegram);
 
-  const [tab, setTab] = useState<"home" | "fun" | "wallet" | "profile" | "search">("home");
+  const [tab, setTab] = useState<"home" | "arena" | "fun" | "wallet" | "profile" | "search">("home");
   const [searchQ, setSearchQ] = useState("");
   const searchRes = useQuery(api.admin.userSearch, token && searchQ.trim().length >= 2 ? { token, q: searchQ.trim() } : "skip");
   const [showVipPanel, setShowVipPanel] = useState(false);
@@ -2299,6 +2301,14 @@ function UserPanel({ token }: { token: string }) {
           <Button
             size="sm"
             variant="outline"
+            className="h-7 text-[11px] gap-1 border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.2)]"
+            onClick={() => setTab("arena")}
+          >
+            <Brain className="size-3 text-emerald-400" /> {lang === "fa" ? "میدان هوش مصنوعی" : "AI Arena"}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
             className="h-7 text-[11px] gap-1 border-emerald-400/30 text-emerald-300 hover:bg-emerald-400/10"
             onClick={() => setTab("wallet")}
           >
@@ -2333,10 +2343,24 @@ function UserPanel({ token }: { token: string }) {
         </div>
       </div>
 
+      {/* Live Winning Ticker (Casino / High-Stakes Profits Stream) */}
+      <LiveWinningTicker lang={lang} />
+
       {/* Desktop Tab Selector */}
       <div className="hidden sm:flex items-center gap-2 rounded-xl border border-border/60 bg-card/40 p-1.5">
         <Button size="sm" variant={tab === "home" ? "default" : "ghost"} className="gap-1.5" onClick={() => setTab("home")}>
           <LayoutDashboard className="size-3.5" /> {s.dashWolf}
+        </Button>
+        <Button
+          size="sm"
+          variant={tab === "arena" ? "default" : "ghost"}
+          className={`gap-1.5 transition-all ${tab === "arena" ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-black font-black shadow-[0_0_15px_rgba(16,185,129,0.3)]" : "text-emerald-400 hover:text-emerald-300"}`}
+          onClick={() => setTab("arena")}
+        >
+          <Brain className="size-3.5" /> {lang === "fa" ? "میدان هوش مصنوعی" : "AI Arena"}
+          <span className="ms-1 rounded bg-amber-400/25 px-1.5 py-0.2 text-[9px] font-black text-amber-300 border border-amber-400/30 animate-pulse">
+            NEW 🔥
+          </span>
         </Button>
         <Button size="sm" variant={tab === "wallet" ? "default" : "ghost"} className="gap-1.5" onClick={() => setTab("wallet")}>
           <Wallet className="size-3.5" /> {s.walletTab}
@@ -2355,7 +2379,11 @@ function UserPanel({ token }: { token: string }) {
         </Button>
       </div>
 
-      {tab === "fun" ? (
+      {tab === "arena" ? (
+        <div className="space-y-6">
+          <MultiAgentArena token={token} lang={lang} />
+        </div>
+      ) : tab === "fun" ? (
         <div className="space-y-6">
           <Card className="border-emerald-400/20 bg-card/60">
             <CardHeader className="pb-2">

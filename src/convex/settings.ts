@@ -252,7 +252,8 @@ export const DEFAULT_SETTINGS: Record<string, any> = {
   // ─── vip ─────────────────────────────────────────────────────────────
   "vip.minCapital": 20, // minimum capital (USDT) for a VIP investment request
   "vip.freeTrial": true, // every new user gets a free VIP trial
-  "vip.trialHours": 48, // duration of the free VIP trial in hours
+  "vip.trialDays": 21, // duration of the free VIP trial in days (3 weeks)
+  "vip.trialHours": 504, // duration in hours (21 * 24 = 504 hours)
   "support.botUsername": SEED_BOT_USERNAME, // general online support (@username)
   "support.vipUsername": "Mamadmari", // VIP users get direct admin support
   "support.email": "motamedmohamad1@gmail.com", // public support email shown on landing
@@ -316,6 +317,16 @@ export const SETTING_KEYS = new Set([
   "ai.enabled",
   "support.email",
   "support.telegramBot",
+  "support.botUsername",
+  "support.vipUsername",
+  "usdt.tomanRate",
+  "usdt.rate",
+  "vip.freeTrial",
+  "vip.trialDays",
+  "vip.trialHours",
+  "coins.tomanPerCoin",
+  "coins.coinPerHour",
+  "coins.packages",
 ]);
 
 function mask(s: string): string {
@@ -556,8 +567,9 @@ export async function ensureVipPackages(ctx: any): Promise<void> {
       durationDays: 30,
       minCapital: 20,
       maxCapital: 150,
-      features: ["Engine signals", "Portfolio tracking", "Telegram alerts"],
-      featuresFa: ["سیگنال‌های موتور", "ردیابی پرتفوی", "اعلان تلگرام"],
+      features: ["Engine signals", "Portfolio tracking", "Telegram alerts", "5,000 Free Wolf Coins"],
+      featuresFa: ["سیگنال‌های موتور", "ردیابی پرتفوی", "اعلان تلگرام", "۵٬۰۰۰ ولف‌کوین هدیه"],
+      giftCoins: 5000,
       riskDisclosure: "بازدهی تضمینی وجود ندارد؛ سرمایه شما در اختیار ربات قرار می‌گیرد.",
       terms: "اشتراک ۳۰ روزه برنزی",
       status: true,
@@ -570,8 +582,9 @@ export async function ensureVipPackages(ctx: any): Promise<void> {
       durationDays: 30,
       minCapital: 151,
       maxCapital: 500,
-      features: ["All Bronze", "Priority signals", "Weekly AI report"],
-      featuresFa: ["تمام مزایای برنزی", "سیگنال اولویت‌دار", "گزارش هفتگی هوش مصنوعی"],
+      features: ["All Bronze", "Priority signals", "Weekly AI report", "15,000 Free Wolf Coins"],
+      featuresFa: ["تمام مزایای برنزی", "سیگنال اولویت‌دار", "گزارش هفتگی هوش مصنوعی", "۱۵٬۰۰۰ ولف‌کوین هدیه"],
+      giftCoins: 15000,
       riskDisclosure: "بازدهی تضمینی وجود ندارد؛ سرمایه شما در اختیار ربات قرار می‌گیرد.",
       terms: "اشتراک ۳۰ روزه نقره‌ای",
       status: true,
@@ -584,8 +597,9 @@ export async function ensureVipPackages(ctx: any): Promise<void> {
       durationDays: 30,
       minCapital: 501,
       maxCapital: 2000,
-      features: ["All Silver", "Direct admin support", "Full engine access"],
-      featuresFa: ["تمام مزایای نقره‌ای", "پشتیبانی مستقیم مدیر", "دسترسی کامل موتور"],
+      features: ["All Silver", "Direct admin support", "Full engine access", "50,000 Free Wolf Coins"],
+      featuresFa: ["تمام مزایای نقره‌ای", "پشتیبانی مستقیم مدیر", "دسترسی کامل موتور", "۵۰٬۰۰۰ ولف‌کوین هدیه"],
+      giftCoins: 50000,
       riskDisclosure: "بازدهی تضمینی وجود ندارد؛ سرمایه شما در اختیار ربات قرار می‌گیرد.",
       terms: "اشتراک ۳۰ روزه طلایی",
       status: true,
@@ -598,8 +612,9 @@ export async function ensureVipPackages(ctx: any): Promise<void> {
       durationDays: 90,
       minCapital: 20,
       maxCapital: 10000,
-      features: ["All Gold", "90-day subscription", "Capital up to $10,000", "VIP priority support"],
-      featuresFa: ["تمام مزایای طلایی", "اشتراک ۹۰ روزه", "سرمایه تا ۱۰٬۰۰۰ دلار", "پشتیبانی اولویت‌دار VIP"],
+      features: ["All Gold", "90-day subscription", "Capital up to $10,000", "VIP priority support", "120,000 Free Wolf Coins"],
+      featuresFa: ["تمام مزایای طلایی", "اشتراک ۹۰ روزه", "سرمایه تا ۱۰٬۰۰۰ دلار", "پشتیبانی اولویت‌دار VIP", "۱۲۰٬۰۰۰ ولف‌کوین هدیه"],
+      giftCoins: 120000,
       riskDisclosure: "بازدهی تضمینی وجود ندارد؛ سرمایه شما در اختیار ربات قرار می‌گیرد.",
       terms: "اشتراک ۹۰ روزه پلاتین",
       status: true,

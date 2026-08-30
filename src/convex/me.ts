@@ -250,13 +250,14 @@ export const grantFreeTrial = internalMutation({
     if (!user || user.vipPackage) return { ok: false, reason: "already_has_package" };
     const settings = await getSettingsMap(ctx);
     if (settings["vip.freeTrial"] === false) return { ok: false, reason: "disabled" };
-    const hours = Math.max(1, Number(settings["vip.trialHours"] ?? 48));
+    const days = Number(settings["vip.trialDays"] ?? 21);
+    const hours = Math.max(1, Number(settings["vip.trialHours"] ?? (days * 24)));
     await ctx.db.patch(userId, {
       isVip: true,
       vipPackage: "trial",
       vipExpiresAt: Date.now() + hours * 3600_000,
     });
-    await log(ctx, "INFO", "vip.trial.granted", `user=${userId} hours=${hours}`, "system");
+    await log(ctx, "INFO", "vip.trial.granted", `user=${userId} hours=${hours} days=${Math.round(hours / 24)}`, "system");
     return { ok: true };
   },
 });

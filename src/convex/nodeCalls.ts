@@ -75,6 +75,8 @@ const KEYLESS_PROVIDER_IDS = new Set([
   "kiro",
   "nanobot",
   "apfel",
+  "ollama",
+  "lmstudio",
 ]);
 
 async function geminiGenerate(
@@ -158,7 +160,7 @@ async function geminiGenerate(
         const msg = data?.error?.message ?? `HTTP ${res.status}`;
         lastError = new Error(`Gemini (${mName}): ${msg}`);
         const low = msg.toLowerCase();
-        // If high demand, overloaded, not found, deprecated, no longer available, or temporary error, try next model
+        // If high demand, overloaded, not found, deprecated, no longer available, quota, or temporary error, try next model
         if (
           low.includes("high demand") ||
           low.includes("overloaded") ||
@@ -168,6 +170,10 @@ async function geminiGenerate(
           low.includes("deprecated") ||
           low.includes("update your code") ||
           low.includes("exhausted") ||
+          low.includes("quota") ||
+          low.includes("rate") ||
+          low.includes("limit") ||
+          low.includes("billing") ||
           low.includes("503") ||
           low.includes("404") ||
           low.includes("429")
@@ -193,6 +199,10 @@ async function geminiGenerate(
         errMsg.includes("deprecated") ||
         errMsg.includes("update your code") ||
         errMsg.includes("exhausted") ||
+        errMsg.includes("quota") ||
+        errMsg.includes("rate") ||
+        errMsg.includes("limit") ||
+        errMsg.includes("billing") ||
         errMsg.includes("503") ||
         errMsg.includes("404") ||
         errMsg.includes("429")

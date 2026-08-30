@@ -272,6 +272,25 @@
   .glow-gold {
     box-shadow: 0 0 0 1px oklch(0.76 0.125 84 / 22%), 0 0 42px oklch(0.76 0.125 84 / 10%);
   }
+  .glow-casino {
+    box-shadow: 0 0 30px rgba(16, 185, 129, 0.25), 0 0 60px rgba(245, 158, 11, 0.15);
+  }
+  .jackpot-shimmer {
+    background: linear-gradient(90deg, transparent 0%, rgba(245, 158, 11, 0.2) 50%, transparent 100%);
+    background-size: 200% 100%;
+    animation: shimmer 3s infinite;
+  }
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+  .laser-pulse {
+    animation: laser 2s ease-in-out infinite;
+  }
+  @keyframes laser {
+    0%, 100% { filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.6)); }
+    50% { filter: drop-shadow(0 0 20px rgba(245, 158, 11, 0.9)); }
+  }
   .terminal-font {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
     font-variant-numeric: tabular-nums;

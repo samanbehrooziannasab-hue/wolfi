@@ -9,7 +9,7 @@
 import { v } from "convex/values";
 import { action, internalAction, internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { requireAdmin, requireStaff, resolveWolfUser } from "./wolfAuth";
+import { requireAdmin, requireStaff, resolveAdmin, resolveStaff, resolveWolfUser } from "./wolfAuth";
 import { getSettingsMap } from "./settings";
 import { buildDailyLesson } from "./aiPolicy";
 import { audit } from "./logs";
@@ -375,7 +375,8 @@ export const triggerEducation = action({
 export const listEducation = query({
   args: { token: v.string(), status: v.optional(v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected"))) },
   handler: async (ctx, { token, status }) => {
-    await requireStaff(ctx, token);
+    const staff = await resolveStaff(ctx, token);
+    if (!staff) return [];
     const rows = await ctx.db.query("education").order("desc").take(200);
     return status ? rows.filter((r: any) => r.status === status) : rows;
   },

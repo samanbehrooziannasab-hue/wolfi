@@ -79,6 +79,22 @@ export const resolveUserInternal = internalQuery({
   },
 });
 
+export async function resolveAdmin(ctx: any, token?: string | null): Promise<any | null> {
+  const user = await resolveWolfUser(ctx, token);
+  if (!user) return null;
+  if (!user.isAdmin && user.role !== "admin") return null;
+  return user;
+}
+
+export async function resolveStaff(ctx: any, token?: string | null): Promise<any | null> {
+  const user = await resolveWolfUser(ctx, token);
+  if (!user) return null;
+  if (!user.isAdmin && !user.isAssistant && user.role !== "admin" && user.role !== "assistant") {
+    return null;
+  }
+  return user;
+}
+
 /** Used by admin-only mutations: throws a Persian-friendly error when not allowed. */
 export async function requireAdmin(ctx: any, token?: string | null): Promise<any> {
   const user = await resolveWolfUser(ctx, token);

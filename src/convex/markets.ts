@@ -395,7 +395,9 @@ export const listCandles = query({
   args: { token: v.string(), symbol: v.string(), timeframe: v.optional(v.string()) },
   handler: async (ctx, { token, symbol, timeframe }) => {
     const user = await resolveWolfUser(ctx, token);
-    if (!user || !user.isAdmin) throw new Error("forbidden");
+    if (!user || (!user.isAdmin && !user.isAssistant && user.role !== "admin" && user.role !== "assistant")) {
+      return { symbol, timeframe: timeframe ?? "", data: [] };
+    }
     const rows = await ctx.db
       .query("candles")
       .withIndex("by_symbol", (q) => q.eq("symbol", symbol))

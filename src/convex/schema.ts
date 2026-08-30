@@ -397,11 +397,14 @@ const schema = defineSchema({
   notifications: defineTable({
     userId: v.optional(v.id("users")),
     broadcast: v.optional(v.boolean()),
-    type: v.string(), // trade | signal | system | admin | ai
+    type: v.string(), // trade | signal | system | admin | ai | announcement
     titleFa: v.string(),
     textFa: v.optional(v.string()),
     titleEn: v.optional(v.string()),
     textEn: v.optional(v.string()),
+    imageUrl: v.optional(v.string()),
+    linkUrl: v.optional(v.string()),
+    dismissedBy: v.optional(v.array(v.id("users"))),
     seen: v.boolean(),
     seenAt: v.optional(v.number()),
     tgSent: v.optional(v.boolean()),
@@ -534,6 +537,7 @@ const schema = defineSchema({
     userId: v.optional(v.id("users")),
     fromAdmin: v.boolean(),
     text: v.string(),
+    imageUrl: v.optional(v.string()),
     created: v.number(),
   }).index("by_ticket", ["ticketId"]),
 
@@ -584,11 +588,12 @@ const schema = defineSchema({
   // ─── toman / wolf-coin ledger (every mutation is recorded) ────────────
   coinTransactions: defineTable({
     userId: v.id("users"),
-    currency: v.union(v.literal("toman"), v.literal("wolf")),
+    currency: v.union(v.literal("toman"), v.literal("wolf"), v.literal("usdt")),
     delta: v.number(), // + credit / - debit
     balanceAfter: v.optional(v.number()),
-    reason: v.string(), // deposit | withdrawal | voucher | buy_coins | burn | reward | admin
+    reason: v.string(), // deposit | withdrawal | voucher | buy_coins | burn | reward | admin | discount | vip_purchase
     ref: v.optional(v.string()),
+    rate: v.optional(v.number()),
     created: v.number(),
   }).index("by_user", ["userId"]),
 
@@ -603,6 +608,39 @@ const schema = defineSchema({
     status: v.boolean(),
     created: v.number(),
   }).index("by_code", ["code"]),
+
+  // ─── discount / promo codes (separate from coin vouchers: VIP % / amount off or VIP days) ───
+  discountCodes: defineTable({
+    code: v.string(),
+    titleFa: v.optional(v.string()),
+    discountPercent: v.optional(v.number()), // e.g. 20 (20% off)
+    discountAmount: v.optional(v.number()), // e.g. 10 USDT discount
+    vipDaysGift: v.optional(v.number()), // e.g. 3 days VIP added
+    maxUses: v.number(),
+    usedCount: v.number(),
+    usedBy: v.array(v.id("users")),
+    expiresAt: v.optional(v.number()),
+    status: v.boolean(),
+    createdBy: v.optional(v.string()),
+    created: v.number(),
+  }).index("by_code", ["code"]),
+
+  // ─── fundamental news & sentiment analysis ───────────────────────────
+  fundamentalNews: defineTable({
+    titleFa: v.string(),
+    titleEn: v.string(),
+    summaryFa: v.string(),
+    summaryEn: v.string(),
+    sentiment: v.union(v.literal("bullish"), v.literal("bearish"), v.literal("neutral")),
+    impact: v.union(v.literal("high"), v.literal("medium"), v.literal("low")),
+    category: v.string(), // crypto | forex | macro | fed
+    symbol: v.optional(v.string()),
+    source: v.string(),
+    imageUrl: v.optional(v.string()),
+    sentTgFaAt: v.optional(v.number()),
+    sentTgEnAt: v.optional(v.number()),
+    created: v.number(),
+  }).index("by_time", ["created"]),
 
   // ─── gamified education: guess the next candle (demo) ─────────────────
   demoPredictions: defineTable({

@@ -106,6 +106,20 @@ export const AI_PROVIDERS: AiProviderDef[] = [
   // exposing web AIs (Gemini…) through /v1/chat/completions. Key is OPTIONAL
   // (browser login does the auth); set WEBAI_API_BASE after deploying it.
   { id: "webai", kind: "keyed", labelFa: "WebAI-to-API (self-hosted)", envKey: "WEBAI_API_KEY" },
+  // SambaNova Cloud — Ultra-fast inference with free tier (Llama 3.3 70B & DeepSeek)
+  { id: "sambanova", kind: "keyed", labelFa: "SambaNova Cloud", envKey: "SAMBANOVA_API_KEY", base: "https://api.sambanova.ai/v1" },
+  // Together AI — High performance open models
+  { id: "together", kind: "keyed", labelFa: "Together AI", envKey: "TOGETHER_API_KEY", base: "https://api.together.xyz/v1" },
+  // DeepInfra — Cost-effective OpenAI-compatible API
+  { id: "deepinfra", kind: "keyed", labelFa: "DeepInfra", envKey: "DEEPINFRA_API_KEY", base: "https://api.deepinfra.com/v1/openai" },
+  // Cohere — Command R+ models
+  { id: "cohere", kind: "keyed", labelFa: "Cohere", envKey: "COHERE_API_KEY", base: "https://api.cohere.ai/v1" },
+  // Cloudflare Workers AI — Free 10,000 neurons/day tier
+  { id: "cloudflare", kind: "keyed", labelFa: "Cloudflare AI", envKey: "CLOUDFLARE_API_KEY", baseEnv: "CLOUDFLARE_AI_BASE" },
+  // Ollama — 100% Free Local Offline LLMs (http://127.0.0.1:11434/v1)
+  { id: "ollama", kind: "keyless", labelFa: "Ollama (Local / Free)", base: "http://127.0.0.1:11434/v1", baseEnv: "OLLAMA_BASE" },
+  // LM Studio — Local inference server (http://127.0.0.1:1234/v1)
+  { id: "lmstudio", kind: "keyless", labelFa: "LM Studio (Local / Free)", base: "http://127.0.0.1:1234/v1", baseEnv: "LMSTUDIO_BASE" },
 ];
 
 /**
@@ -144,6 +158,13 @@ export const AI_PROVIDER_LIMITS: Record<string, number | null> = {
   apfel: null, // on-device
   freeoneapi: null, // self-hosted gateway
   webai: null, // self-hosted browser runtime
+  sambanova: 2000,
+  together: 500,
+  deepinfra: 500,
+  cohere: 300,
+  cloudflare: 1000,
+  ollama: null,
+  lmstudio: null,
 };
 
 /** Default model per provider id (used by the router + single executor). */
@@ -173,6 +194,13 @@ export const AI_PROVIDER_MODELS: Record<string, string> = {
   apfel: "local",
   freeoneapi: "gpt-4o-mini",
   webai: "gemini-3.6-flash",
+  sambanova: "Meta-Llama-3.3-70B-Instruct",
+  together: "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo",
+  deepinfra: "meta-llama/Meta-Llama-3.3-70B-Instruct",
+  cohere: "command-r-plus",
+  cloudflare: "@cf/meta/llama-3.3-70b-instruct",
+  ollama: "llama3.3",
+  lmstudio: "local-model",
 };
 
 /**
@@ -207,6 +235,13 @@ export const AI_PROVIDER_VISION: Record<string, boolean> = {
   apfel: false,
   freeoneapi: false,
   webai: true,
+  sambanova: true,
+  together: true,
+  deepinfra: false,
+  cohere: false,
+  cloudflare: false,
+  ollama: true,
+  lmstudio: true,
 };
 
 /** Which error class a message belongs to (drives cooldown + retryability). */
@@ -265,12 +300,15 @@ export function classifyAiError(message: string | null | undefined): AiErrorClas
   if (
     m.includes("quota") ||
     m.includes("billing") ||
-    m.includes("rate limit") && m.includes("exceeded") ||
+    m.includes("exceeded") ||
+    m.includes("rate-limit") ||
+    m.includes("rate limit") ||
+    m.includes("resource_exhausted") ||
     m.includes("insufficient_quota") ||
-    m.includes("429") && m.includes("quota") ||
     m.includes("daily limit") ||
     m.includes("سهمیه") ||
-    m.includes("402") // payment required (keyless endpoints occasionally demand payment)
+    m.includes("402") ||
+    m.includes("429")
   ) {
     return { kind: "quota", baseCooldownMs: KIND_BASE_MS.quota, retryable: true };
   }

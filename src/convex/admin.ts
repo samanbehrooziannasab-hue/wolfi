@@ -19,7 +19,7 @@ import {
   getSettingsMap,
   setSetting,
 } from "./settings";
-import { requireAdmin, requireStaff, resolveWolfUser } from "./wolfAuth";
+import { requireAdmin, requireStaff, resolveAdmin, resolveStaff, resolveWolfUser } from "./wolfAuth";
 import { buildSignalMessage } from "./aiPolicy";
 import { AI_PROVIDERS, AI_PROVIDER_LIMITS, AI_PROVIDER_MODELS, AI_PROVIDER_VISION } from "./aiProviders";
 
@@ -109,7 +109,8 @@ async function getOrCreateWallet(
 export const listUsers = query({
   args: { token: v.string() },
   handler: async (ctx, { token }) => {
-    await requireStaff(ctx, token);
+    const staff = await resolveStaff(ctx, token);
+    if (!staff) return [];
     const [users, wallets] = await Promise.all([
       ctx.db.query("users").collect(),
       ctx.db.query("wallets").collect(),
@@ -581,7 +582,8 @@ export const requestUnfreeze = mutation({
 export const listTransactions = query({
   args: { token: v.string() },
   handler: async (ctx, { token }) => {
-    await requireStaff(ctx, token);
+    const staff = await resolveStaff(ctx, token);
+    if (!staff) return [];
     const [txs, wallets, users] = await Promise.all([
       ctx.db.query("walletTransactions").order("desc").take(100),
       ctx.db.query("wallets").collect(),
@@ -815,7 +817,8 @@ export const requestVip = mutation({
 export const listVipRequests = query({
   args: { token: v.string() },
   handler: async (ctx, { token }) => {
-    await requireStaff(ctx, token);
+    const staff = await resolveStaff(ctx, token);
+    if (!staff) return [];
     const [requests, users] = await Promise.all([
       ctx.db.query("vipRequests").withIndex("by_status", (q: any) => q.eq("status", "pending")).collect(),
       ctx.db.query("users").collect(),
@@ -1121,7 +1124,8 @@ async function getOrCreateEncryptionKey(ctx: any): Promise<string> {
 export const listExchangeAccounts = query({
   args: { token: v.string() },
   handler: async (ctx, { token }) => {
-    await requireStaff(ctx, token);
+    const staff = await resolveStaff(ctx, token);
+    if (!staff) return [];
     const rows = await ctx.db.query("exchangeAccounts").collect();
     return rows.map((r) => ({
       id: r._id,
@@ -1352,7 +1356,8 @@ function dayStart(offsetMs: number): number {
 export const tradingReports = query({
   args: { token: v.string(), period: v.string() },
   handler: async (ctx, { token, period }) => {
-    await requireStaff(ctx, token);
+    const staff = await resolveStaff(ctx, token);
+    if (!staff) return null;
     const now = Date.now();
     const DAY = 86400000;
     const from =
@@ -1472,7 +1477,8 @@ export const applyRiskPreset = mutation({
 export const riskAdvisor = query({
   args: { token: v.string() },
   handler: async (ctx, { token }) => {
-    await requireStaff(ctx, token);
+    const staff = await resolveStaff(ctx, token);
+    if (!staff) return null;
     const settings = await getSettingsMap(ctx);
     const minScore = Number(settings["risk.minScore"] ?? 80);
     const riskPct = Number(settings["risk.riskPerTrade"] ?? 1.5);
@@ -1568,7 +1574,8 @@ export const listMyTickets = query({
 export const listAllTickets = query({
   args: { token: v.string() },
   handler: async (ctx, { token }) => {
-    await requireStaff(ctx, token);
+    const staff = await resolveStaff(ctx, token);
+    if (!staff) return [];
     const tickets = await ctx.db.query("supportTickets").order("desc").take(100);
     const users = await ctx.db.query("users").collect();
     const userById = new Map<string, any>();
@@ -1756,7 +1763,8 @@ export const applyReferral = mutation({
 export const listReferrals = query({
   args: { token: v.string() },
   handler: async (ctx, { token }) => {
-    await requireStaff(ctx, token);
+    const staff = await resolveStaff(ctx, token);
+    if (!staff) return [];
     const [refs, users] = await Promise.all([ctx.db.query("referrals").collect(), ctx.db.query("users").collect()]);
     const userById = new Map<string, any>();
     for (const u of users) userById.set(u._id, u);
@@ -1776,7 +1784,8 @@ export const listReferrals = query({
 export const listLearningHistory = query({
   args: { token: v.string(), limit: v.optional(v.number()) },
   handler: async (ctx, { token, limit }) => {
-    await requireStaff(ctx, token);
+    const staff = await resolveStaff(ctx, token);
+    if (!staff) return [];
     const rows = await ctx.db.query("learningHistory").order("desc").take(limit ?? 150);
     return rows.map((l: any) => ({
       id: l._id,
@@ -1893,7 +1902,8 @@ export const refreshStrategyPerformance = mutation({
 export const listStrategyPerformance = query({
   args: { token: v.string() },
   handler: async (ctx, { token }) => {
-    await requireStaff(ctx, token);
+    const staff = await resolveStaff(ctx, token);
+    if (!staff) return [];
     const rows = await ctx.db.query("strategyPerformance").collect();
     return rows.sort((a: any, b: any) => b.totalPnl - a.totalPnl);
   },
@@ -1904,7 +1914,8 @@ export const listStrategyPerformance = query({
 export const listEngineLogs = query({
   args: { token: v.string(), level: v.optional(v.string()), limit: v.optional(v.number()) },
   handler: async (ctx, { token, level, limit }) => {
-    await requireStaff(ctx, token);
+    const staff = await resolveStaff(ctx, token);
+    if (!staff) return [];
     let rows = await ctx.db.query("engineLogs").order("desc").take(limit ?? 200);
     if (level) rows = rows.filter((r: any) => r.level === level);
     return rows;
@@ -1914,7 +1925,8 @@ export const listEngineLogs = query({
 export const listAuditLogs = query({
   args: { token: v.string(), limit: v.optional(v.number()) },
   handler: async (ctx, { token, limit }) => {
-    await requireStaff(ctx, token);
+    const staff = await resolveStaff(ctx, token);
+    if (!staff) return [];
     return ctx.db.query("auditLogs").order("desc").take(limit ?? 100);
   },
 });
@@ -1924,7 +1936,8 @@ export const listAuditLogs = query({
 export const userDetail = query({
   args: { token: v.string(), userId: v.id("users") },
   handler: async (ctx, args) => {
-    await requireStaff(ctx, args.token);
+    const staff = await resolveStaff(ctx, args.token);
+    if (!staff) return null;
     const user = await ctx.db.get(args.userId);
     if (!user) throw new Error("کاربر یافت نشد");
     const [wallets, wtxs, coinTxs, auditRows, openPos, closedPos, notifications] = await Promise.all([
@@ -2032,7 +2045,8 @@ export const userDetail = query({
 export const listClosedPositions = query({
   args: { token: v.string(), limit: v.optional(v.number()) },
   handler: async (ctx, { token, limit }) => {
-    await requireStaff(ctx, token);
+    const staff = await resolveStaff(ctx, token);
+    if (!staff) return [];
     const rows = await ctx.db.query("closed_positions").order("desc").take(limit ?? 150);
     return rows.map((p: any) => ({
       id: p._id,
@@ -2149,7 +2163,8 @@ export const candlesOhlc = internalQuery({
 export const userSearch = query({
   args: { token: v.string(), q: v.string() },
   handler: async (ctx, { token, q }) => {
-    await requireStaff(ctx, token);
+    const staff = await resolveStaff(ctx, token);
+    if (!staff) return [];
     const needle = String(q ?? "").trim().toLowerCase();
     if (needle.length < 2) return [];
     const [users, wallets] = await Promise.all([
@@ -2194,7 +2209,8 @@ export const userSearch = query({
 export const aiProviderHealth = query({
   args: { token: v.string() },
   handler: async (ctx, { token }) => {
-    await requireStaff(ctx, token);
+    const staff = await resolveStaff(ctx, token);
+    if (!staff) return [];
     const settings = await getSettingsMap(ctx);
     let state: Record<string, any> = {};
     try {
