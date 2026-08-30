@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512" height="512" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="fur1" x1="64" y1="4" x2="64" y2="124" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6ff5c0"/>
+      <stop offset="0.3" stop-color="#10b981"/>
+      <stop offset="0.65" stop-color="#0d9668"/>
+      <stop offset="1" stop-color="#042f22"/>
+    </linearGradient>
+    <linearGradient id="fur2" x1="30" y1="20" x2="98" y2="118" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#34d399"/>
+      <stop offset="0.5" stop-color="#059669"/>
+      <stop offset="1" stop-color="#022c1e"/>
+    </linearGradient>
+    <linearGradient id="furDark" x1="64" y1="50" x2="64" y2="120" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#065f46"/>
+      <stop offset="1" stop-color="#021a12"/>
+    </linearGradient>
+    <linearGradient id="earIn" x1="30" y1="10" x2="30" y2="40" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#042f22"/>
+      <stop offset="1" stop-color="#1a0a0a"/>
+    </linearGradient>
+    <linearGradient id="eyeG" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#fffbe8"/>
+      <stop offset="0.25" stop-color="#fbbf24"/>
+      <stop offset="0.6" stop-color="#f59e0b"/>
+      <stop offset="1" stop-color="#b45309"/>
+    </linearGradient>
+    <linearGradient id="eyeG2" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#fffbe8"/>
+      <stop offset="0.25" stop-color="#fbbf24"/>
+      <stop offset="0.6" stop-color="#f59e0b"/>
+      <stop offset="1" stop-color="#b45309"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="38%" r="50%">
+      <stop stop-color="#34d399" stop-opacity="0.2"/>
+      <stop offset="1" stop-color="#0b1a14" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="shadow"><feDropShadow dx="0" dy="1" stdDeviation="1" flood-color="#010d08" flood-opacity="0.5"/></filter>
+    <filter id="gl"><feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="#fbbf24" flood-opacity="0.7"/></filter>
+  </defs>
+
+  <!-- BG -->
+  <rect x="2" y="2" width="124" height="124" rx="30" fill="#090f0d"/>
+  <rect x="2" y="2" width="124" height="124" rx="30" stroke="#14392d" stroke-width="1.5"/>
+  <rect x="7" y="7" width="114" height="114" rx="25" fill="url(#glow)"/>
+
+  <!-- Trading line -->
+  <path d="M12 98 L24 86 L32 92 L44 72 L56 78 L68 58 L80 64 L92 48 L106 42 L116 44" stroke="#34d399" stroke-opacity="0.2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Ear Left -->
+  <path d="M24 42 L16 8 L40 34 Z" fill="url(#fur1)" stroke="#0a7a56" stroke-width="0.8" stroke-linejoin="round"/>
+  <path d="M26 38 L19.5 13 L38 33 Z" fill="url(#earIn)"/>
+  <path d="M20 14 L17 10 L22 16 Z" fill="#6ee7b7" opacity="0.3"/>
+  <path d="M18 20 L15 18 L20 24 Z" fill="#6ee7b7" opacity="0.2"/>
+
+  <!-- Ear Right -->
+  <path d="M104 42 L112 8 L88 34 Z" fill="url(#fur1)" stroke="#0a7a56" stroke-width="0.8" stroke-linejoin="round"/>
+  <path d="M102 38 L108.5 13 L90 33 Z" fill="url(#earIn)"/>
+  <path d="M108 14 L111 10 L106 16 Z" fill="#6ee7b7" opacity="0.3"/>
+  <path d="M110 20 L113 18 L108 24 Z" fill="#6ee7b7" opacity="0.2"/>
+
+  <!-- Head -->
+  <path d="M64 20 C48 20 34 28 28 40 C22 52 18 62 16 72 C14 82 18 92 26 100 C34 108 48 114 58 118 L64 120 L70 118 C80 114 94 108 102 100 C110 92 114 82 112 72 C110 62 106 52 100 40 C94 28 80 20 64 20 Z"
+        fill="url(#fur1)" stroke="url(#fur2)" stroke-width="1.3" stroke-linejoin="round" filter="url(#shadow)"/>
+
+  <!-- Crown fur -->
+  <path d="M36 26 C38 22 42 20 46 22 L44 28 Z" fill="#0d9668" opacity="0.6"/>
+  <path d="M50 20 C52 18 56 17 58 20 L54 26 Z" fill="#0d9668" opacity="0.5"/>
+  <path d="M62 18 C64 16 68 16 70 19 L66 25 Z" fill="#0d9668" opacity="0.5"/>
+  <path d="M78 20 C80 18 84 18 86 22 L82 27 Z" fill="#0d9668" opacity="0.6"/>
+  <path d="M88 24 C90 22 94 24 92 28 L90 30 Z" fill="#0d9668" opacity="0.5"/>
+
+  <!-- Brow ridge -->
+  <path d="M24 46 L36 38 L50 44" stroke="#0aa877" stroke-width="2.2" stroke-linecap="round" fill="none" opacity="0.85"/>
+  <path d="M104 46 L92 38 L78 44" stroke="#0aa877" stroke-width="2.2" stroke-linecap="round" fill="none" opacity="0.85"/>
+
+  <!-- Fur texture -->
+  <path d="M42 28 C46 32 48 38 46 44" stroke="#6ee7b7" stroke-width="0.6" stroke-linecap="round" fill="none" opacity="0.2"/>
+  <path d="M86 28 C82 32 80 38 82 44" stroke="#6ee7b7" stroke-width="0.6" stroke-linecap="round" fill="none" opacity="0.2"/>
+
+  <!-- Eye sockets -->
+  <ellipse cx="42" cy="58" rx="16" ry="9" fill="#031a12" opacity="0.6"/>
+  <ellipse cx="86" cy="58" rx="16" ry="9" fill="#031a12" opacity="0.6"/>
+
+  <!-- Left Eye -->
+  <path d="M28 56 C33 48 44 46 54 54 C50 60 36 62 28 56 Z" fill="url(#eyeG)" filter="url(#gl)"/>
+  <ellipse cx="40" cy="54" rx="5" ry="5.5" fill="#1a1008" opacity="0.8"/>
+  <circle cx="40" cy="53" r="3.2" fill="#0a0704"/>
+  <circle cx="40" cy="53" r="1.6" fill="#000"/>
+  <circle cx="40" cy="53" r="4" fill="none" stroke="#b45309" stroke-width="0.6" opacity="0.5"/>
+  <circle cx="42" cy="51" r="1.5" fill="#fffef5" opacity="0.95"/>
+  <circle cx="38" cy="55" r="0.7" fill="#fffef5" opacity="0.4"/>
+
+  <!-- Right Eye -->
+  <path d="M100 56 C95 48 84 46 74 54 C78 60 92 62 100 56 Z" fill="url(#eyeG2)" filter="url(#gl)"/>
+  <ellipse cx="88" cy="54" rx="5" ry="5.5" fill="#1a1008" opacity="0.8"/>
+  <circle cx="88" cy="53" r="3.2" fill="#0a0704"/>
+  <circle cx="88" cy="53" r="1.6" fill="#000"/>
+  <circle cx="88" cy="53" r="4" fill="none" stroke="#b45309" stroke-width="0.6" opacity="0.5"/>
+  <circle cx="86" cy="51" r="1.5" fill="#fffef5" opacity="0.95"/>
+  <circle cx="90" cy="55" r="0.7" fill="#fffef5" opacity="0.4"/>
+
+  <!-- Cheek fur -->
+  <path d="M16 62 C12 72 14 84 22 92 C18 86 14 76 16 66 Z" fill="#0a6b4e" opacity="0.5"/>
+  <path d="M14 70 C10 80 12 88 20 94 C16 88 12 78 13 70 Z" fill="#074e38" opacity="0.35"/>
+  <path d="M12 78 C8 86 10 94 18 98 C14 92 10 84 11 78 Z" fill="#064e3b" opacity="0.25"/>
+  <path d="M112 62 C116 72 114 84 106 92 C110 86 114 76 112 66 Z" fill="#0a6b4e" opacity="0.5"/>
+  <path d="M114 70 C118 80 116 88 108 94 C112 88 116 78 115 70 Z" fill="#074e38" opacity="0.35"/>
+  <path d="M116 78 C120 86 118 94 110 98 C114 92 118 84 117 78 Z" fill="#064e3b" opacity="0.25"/>
+
+  <!-- Muzzle -->
+  <path d="M48 64 C52 58 58 54 64 52 C70 54 76 58 80 64 L76 84 L64 88 L52 84 Z" fill="url(#furDark)" opacity="0.85"/>
+  <path d="M52 68 L64 60 L76 68" stroke="#0aa877" stroke-width="0.6" stroke-linecap="round" fill="none" opacity="0.3"/>
+
+  <!-- Nose -->
+  <path d="M52 84 C56 78 64 74 76 78 C78 82 78 88 74 92 L64 96 L54 92 C50 88 50 82 52 84 Z" fill="#021208"/>
+  <ellipse cx="64" cy="84" rx="12" ry="7" fill="#080808"/>
+  <path d="M58 80 C60 79 68 79 70 80" stroke="#1a3d2e" stroke-width="0.8" stroke-linecap="round" fill="none" opacity="0.5"/>
+  <ellipse cx="58" cy="85" rx="3.5" ry="2.5" fill="#020804"/>
+  <ellipse cx="70" cy="85" rx="3.5" ry="2.5" fill="#020804"/>
+  <ellipse cx="58" cy="85.5" rx="2" ry="1.2" fill="#010503"/>
+  <ellipse cx="70" cy="85.5" rx="2" ry="1.2" fill="#010503"/>
+  <ellipse cx="64" cy="82" rx="3" ry="1.5" fill="#1a3d2e" opacity="0.3"/>
+
+  <!-- Mouth -->
+  <path d="M64 94 L64 100" stroke="#021208" stroke-width="1.4" stroke-linecap="round"/>
+  <path d="M48 100 C52 102 58 104 64 105 C70 104 76 102 80 100" stroke="#021208" stroke-width="1.2" stroke-linecap="round" fill="none"/>
+
+  <!-- Chin -->
+  <path d="M44 108 C48 112 56 116 64 118 C72 116 80 112 84 108 C80 116 72 120 64 122 C56 120 48 116 44 108 Z" fill="url(#furDark)" opacity="0.6"/>
+  <path d="M50 112 L48 116 L54 114 Z" fill="#065f46" opacity="0.4"/>
+  <path d="M60 116 L58 120 L64 118 Z" fill="#065f46" opacity="0.3"/>
+  <path d="M68 118 L70 122 L64 120 Z" fill="#065f46" opacity="0.3"/>
+  <path d="M78 112 L80 116 L74 114 Z" fill="#065f46" opacity="0.4"/>
+
+  <!-- Whisker dots -->
+  <circle cx="34" cy="86" r="1" fill="#0d9668" opacity="0.35"/>
+  <circle cx="31" cy="90" r="0.8" fill="#0d9668" opacity="0.25"/>
+  <circle cx="29" cy="94" r="0.7" fill="#0d9668" opacity="0.2"/>
+  <circle cx="94" cy="86" r="1" fill="#0d9668" opacity="0.35"/>
+  <circle cx="97" cy="90" r="0.8" fill="#0d9668" opacity="0.25"/>
+  <circle cx="99" cy="94" r="0.7" fill="#0d9668" opacity="0.2"/>
+
+  <!-- Scar -->
+  <path d="M30 50 L26 44" stroke="#0aa877" stroke-width="0.8" stroke-linecap="round" opacity="0.4"/>
+  <path d="M31 51 L28 46" stroke="#6ee7b7" stroke-width="0.4" stroke-linecap="round" opacity="0.2"/>
+
+  <!-- Fangs -->
+  <path d="M55 102 L53 106 L57 103 Z" fill="#f2faf5" opacity="0.85"/>
+  <path d="M73 102 L75 106 L71 103 Z" fill="#f2faf5" opacity="0.85"/>
+
+  <!-- Breath mist -->
+  <ellipse cx="64" cy="110" rx="14" ry="4" fill="#6ee7b7" opacity="0.06"/>
+</svg>

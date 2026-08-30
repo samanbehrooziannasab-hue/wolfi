@@ -1,0 +1,326 @@
+/* DO NOT CHANGE */
+@import "tailwindcss";
+@import "tw-animate-css";
+@custom-variant dark (&:is(.dark *));
+
+/* DO NOT CHANGE */
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  /* Trading Wolf AI brand tokens */
+  --color-gold: var(--gold);
+  --color-gold-soft: var(--gold-soft);
+  --color-info: var(--info);
+  --color-wolf: var(--wolf);
+}
+
+/* ─── Trading Wolf AI — dark terminal theme (default) ─────────────────── */
+:root {
+  --radius: 0.625rem;
+  color-scheme: dark;
+
+  /* charcoal / graphite surfaces — never pure black */
+  --background: oklch(0.155 0.01 262);
+  --foreground: oklch(0.945 0.008 262);
+  --card: oklch(0.185 0.012 262);
+  --card-foreground: oklch(0.945 0.008 262);
+  --popover: oklch(0.195 0.012 262);
+  --popover-foreground: oklch(0.945 0.008 262);
+
+  /* emerald — the pack's primary signal */
+  --primary: oklch(0.72 0.145 168);
+  --primary-foreground: oklch(0.16 0.03 168);
+  --secondary: oklch(0.235 0.014 262);
+  --secondary-foreground: oklch(0.92 0.01 262);
+  --muted: oklch(0.225 0.012 262);
+  --muted-foreground: oklch(0.66 0.02 258);
+  --accent: oklch(0.245 0.018 238);
+  --accent-foreground: oklch(0.9 0.015 238);
+  --destructive: oklch(0.62 0.19 25);
+  --border: oklch(1 0 0 / 9%);
+  --input: oklch(1 0 0 / 12%);
+  --ring: oklch(0.78 0.145 168 / 45%);
+
+  --chart-1: oklch(0.72 0.15 168); /* emerald */
+  --chart-2: oklch(0.72 0.13 80); /* gold */
+  --chart-3: oklch(0.72 0.12 225); /* cyan */
+  --chart-4: oklch(0.7 0.09 300); /* violet */
+  --chart-5: oklch(0.65 0.18 25); /* red */
+
+  --sidebar: oklch(0.17 0.011 262);
+  --sidebar-foreground: oklch(0.93 0.008 262);
+  --sidebar-primary: oklch(0.78 0.145 168);
+  --sidebar-primary-foreground: oklch(0.16 0.03 168);
+  --sidebar-accent: oklch(0.24 0.015 262);
+  --sidebar-accent-foreground: oklch(0.93 0.008 262);
+  --sidebar-border: oklch(1 0 0 / 8%);
+  --sidebar-ring: oklch(0.78 0.145 178 / 45%);
+
+  /* brand */
+  --gold: oklch(0.76 0.125 84);
+  --gold-soft: oklch(0.76 0.125 84 / 14%);
+  --info: oklch(0.74 0.11 220);
+  --wolf: oklch(0.5 0.02 262);
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+/* ─── light variant (warm greige — noticeably deeper, never white) ────── */
+.light {
+  --radius: 0.625rem;
+  color-scheme: light;
+
+  /* warm grey-tinted — soft on the eyes, still clearly a light theme */
+  --background: oklch(0.89 0.012 256);
+  --foreground: oklch(0.17 0.022 258);
+  --card: oklch(0.935 0.009 256);
+  --card-foreground: oklch(0.17 0.022 258);
+  --popover: oklch(0.935 0.009 256);
+  --popover-foreground: oklch(0.17 0.022 258);
+
+  /* deeper emerald for readability on grey */
+  --primary: oklch(0.37 0.1 168);
+  --primary-foreground: oklch(0.97 0.005 256);
+  --secondary: oklch(0.85 0.011 256);
+  --secondary-foreground: oklch(0.24 0.02 258);
+  --muted: oklch(0.85 0.011 256);
+  --muted-foreground: oklch(0.42 0.017 254);
+  --accent: oklch(0.83 0.017 228);
+  --accent-foreground: oklch(0.2 0.02 228);
+  --destructive: oklch(0.5 0.16 25);
+  --border: oklch(0.74 0.015 256);
+  --input: oklch(0.74 0.015 256);
+  --ring: oklch(0.37 0.1 168 / 40%);
+
+  --chart-1: oklch(0.4 0.12 168);
+  --chart-2: oklch(0.52 0.11 84);
+  --chart-3: oklch(0.48 0.1 225);
+  --chart-4: oklch(0.48 0.09 300);
+  --chart-5: oklch(0.5 0.16 25);
+
+  --sidebar: oklch(0.87 0.011 256);
+  --sidebar-foreground: oklch(0.2 0.02 258);
+  --sidebar-primary: oklch(0.37 0.1 168);
+  --sidebar-primary-foreground: oklch(0.97 0.005 256);
+  --sidebar-accent: oklch(0.83 0.011 256);
+  --sidebar-accent-foreground: oklch(0.2 0.02 258);
+  --sidebar-border: oklch(0.78 0.013 256);
+  --sidebar-ring: oklch(0.37 0.1 168 / 40%);
+
+  --gold: oklch(0.5 0.11 84);
+  --gold-soft: oklch(0.5 0.11 84 / 16%);
+  --info: oklch(0.43 0.09 225);
+  --wolf: oklch(0.35 0.02 258);
+
+  /* signal shades — dark enough on grey */
+  --color-emerald-300: oklch(0.38 0.1 168);
+  --color-emerald-400: oklch(0.4 0.11 168);
+  --color-emerald-500: oklch(0.42 0.12 168);
+  --color-red-300: oklch(0.5 0.16 25);
+  --color-red-400: oklch(0.52 0.18 25);
+  --color-cyan-300: oklch(0.42 0.09 225);
+  --color-cyan-400: oklch(0.45 0.1 225);
+  --color-amber-300: oklch(0.48 0.1 84);
+  --color-amber-400: oklch(0.5 0.11 84);
+  --color-violet-300: oklch(0.45 0.09 300);
+  --color-violet-400: oklch(0.47 0.1 300);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: "Vazirmatn", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: 700;
+  }
+  button:not([disabled]),
+  [role="button"]:not([disabled]) {
+    cursor: pointer;
+  }
+  ::selection {
+    background: oklch(0.78 0.145 168 / 28%);
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: oklch(0.5 0.01 80 / 28%);
+    border-radius: 8px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.5 0.01 80 / 45%);
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+}
+
+/* ─── Trading Wolf utilities ──────────────────────────────────────────── */
+@layer utilities {
+  /* subtle market-grid backdrop — adapts to light/dark */
+  .bg-market-grid {
+    background-image:
+      linear-gradient(to right, var(--border) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--border) 1px, transparent 1px);
+    background-size: 44px 44px;
+    opacity: 0.45;
+  }
+  .bg-market-grid-fine {
+    background-image:
+      linear-gradient(to right, var(--border) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--border) 1px, transparent 1px);
+    background-size: 22px 22px;
+    opacity: 0.4;
+  }
+  /* radial spotlight used behind hero / auth card */
+  .bg-spot {
+    background:
+      radial-gradient(ellipse 60% 55% at 50% 0%, oklch(0.78 0.145 168 / 10%), transparent 70%),
+      radial-gradient(ellipse 45% 40% at 82% 30%, oklch(0.72 0.12 225 / 6%), transparent 70%);
+  }
+  /* card borders — thin, visible, theme-aware */
+  [data-slot="card"] {
+    border: 1px solid oklch(0 0 0 / 12%);
+  }
+  .dark [data-slot="card"] {
+    border: 1px solid oklch(1 0 0 / 10%);
+  }
+  table {
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+  table th {
+    border-bottom: 2px solid oklch(0 0 0 / 15%);
+    font-weight: 600;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: oklch(0 0 0 / 55%);
+    padding: 8px 12px;
+  }
+  .dark table th {
+    border-bottom: 2px solid oklch(1 0 0 / 12%);
+    color: oklch(1 0 0 / 55%);
+  }
+  table td {
+    border-bottom: 1px solid oklch(0 0 0 / 8%);
+    padding: 8px 12px;
+  }
+  .dark table td {
+    border-bottom: 1px solid oklch(1 0 0 / 6%);
+  }
+  table tr:hover td {
+    background: oklch(0 0 0 / 3%);
+  }
+  .dark table tr:hover td {
+    background: oklch(1 0 0 / 4%);
+  }
+  .text-glow-emerald {
+    text-shadow: 0 0 22px oklch(0.78 0.145 168 / 45%);
+  }
+  .glow-emerald {
+    box-shadow: 0 0 0 1px oklch(0.78 0.145 168 / 22%), 0 0 42px oklch(0.78 0.145 168 / 12%);
+  }
+  .glow-gold {
+    box-shadow: 0 0 0 1px oklch(0.76 0.125 84 / 22%), 0 0 42px oklch(0.76 0.125 84 / 10%);
+  }
+  .terminal-font {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    font-variant-numeric: tabular-nums;
+  }
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+  .animate-pulse-soft {
+    animation: pulse-soft 2.4s ease-in-out infinite;
+  }
+  @keyframes pulse-soft {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.45; }
+  }
+  .ticker-track {
+    animation: ticker 42s linear infinite;
+  }
+  @keyframes ticker {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+/* ─── Mobile responsive fixes ─── */
+@media (max-width: 640px) {
+  /* Dashboard tables scroll horizontally on mobile */
+  .overflow-auto {
+    -webkit-overflow-scrolling: touch;
+  }
+  /* Tabs scroll horizontally on mobile */
+  [data-slot="tabs-list"] {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  [data-slot="tabs-list"]::-webkit-scrollbar {
+    display: none;
+  }
+  /* Ensure cards don't overflow on small screens */
+  [data-slot="card"] {
+    min-width: 0;
+    overflow: hidden;
+  }
+  /* Cards should stack on mobile */
+  .grid {
+    min-width: 0;
+  }
+}
