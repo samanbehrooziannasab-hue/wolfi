@@ -9,28 +9,40 @@
 export type MarketRegime = "TRENDING_BULL" | "TRENDING_BEAR" | "RANGING_CHOPPY" | "VOLATILITY_EXPANSION";
 
 export interface MarketMetrics {
+  symbol?: string;
   price: number;
-  ema9: number;
-  ema21: number;
-  ema50: number;
+  ema9?: number;
+  ema21?: number;
+  ema50?: number;
   ema200?: number;
+  emaFast?: number;
+  emaSlow?: number;
   rsi: number;
   atr: number;
+  atrPct?: number;
   adx?: number;
   bbUpper: number;
   bbLower: number;
   bbMid: number;
-  volLast: number;
-  volAvg: number;
-  trend: "bull" | "bear" | "neutral" | "up" | "down" | "range";
+  volLast?: number;
+  volAvg?: number;
+  volumeRatio?: number;
+  trend?: "bull" | "bear" | "neutral" | "up" | "down" | "range";
   htfTrend?: "bull" | "bear" | "neutral" | "up" | "down" | "range";
+  higherTfTrend?: "bull" | "bear" | "neutral" | "up" | "down" | "range";
+  support?: number;
+  resistance?: number;
+  macd?: number;
+  macdSig?: number;
 }
 
 export interface ValidationResult {
   allowed: boolean;
   regime: MarketRegime;
   scorePenalty: number;
+  adjustedScore: number;
   reasons: string[];
+  warnings: string[];
   blockReason?: string;
   adjustedSl?: number;
   adjustedTp?: number;
@@ -97,13 +109,28 @@ export function detectMarketRegime(m: MarketMetrics): MarketRegime {
  * Verifies if a given trade direction and strategy family is appropriate for current market conditions.
  */
 export function validateMarketConditions(
-  dir: "long" | "short",
-  m: MarketMetrics,
+  arg1: "long" | "short" | MarketMetrics,
+  arg2: MarketMetrics | "long" | "short",
   rawSl: number,
   rawTp: number,
-  strategyFamilies: string[] = [],
+  strategyFamiliesOrScore: string[] | number = [],
   minRR = 1.2
 ): ValidationResult {
+  let dir: "long" | "short";
+  let m: MarketMetrics;
+  let strategyFamilies: string[] = [];
+
+  if (typeof arg1 === "string") {
+    dir = arg1;
+    m = arg2 as MarketMetrics;
+  } else {
+    m = arg1;
+    dir = arg2 as "long" | "short";
+  }
+  if (Array.isArray(strategyFamiliesOrScore)) {
+    strategyFamilies = strategyFamiliesOrScore;
+  }
+
   const p = m.price;
   const regime = detectMarketRegime(m);
   const reasons: string[] = [];
@@ -122,22 +149,30 @@ export function validateMarketConditions(
   if (dir === "long") {
     if (m.rsi > 78) {
       isExhausted = true;
+      const penalty = 100;
+      const res = ["RSI severely overbought (>78) - long trade blocked at extreme exhaustion"];
       return {
         allowed: false,
         regime,
-        scorePenalty: 100,
-        reasons: ["RSI severely overbought (>78) - long trade blocked at extreme exhaustion"],
+        scorePenalty: penalty,
+        adjustedScore: Math.max(0, 100 - penalty),
+        reasons: res,
+        warnings: res,
         blockReason: "EXHAUSTION_RSI_OVERBOUGHT",
         diagnostics: { regime, isExhausted, isVolumeHealthy: true, isMtfAligned: true, bbBandwidthPct, atrPct, volRatio },
       };
     }
     if (m.rsi > 72 && p > m.bbUpper * 1.01) {
       isExhausted = true;
+      const penalty = 100;
+      const res = ["Price extended above upper Bollinger Band with RSI > 72 - overbought risk"];
       return {
         allowed: false,
         regime,
-        scorePenalty: 100,
-        reasons: ["Price extended above upper Bollinger Band with RSI > 72 - overbought risk"],
+        scorePenalty: penalty,
+        adjustedScore: Math.max(0, 100 - penalty),
+        reasons: res,
+        warnings: res,
         blockReason: "EXHAUSTION_BB_UPPER_EXTENDED",
         diagnostics: { regime, isExhausted, isVolumeHealthy: true, isMtfAligned: true, bbBandwidthPct, atrPct, volRatio },
       };
@@ -145,22 +180,30 @@ export function validateMarketConditions(
   } else {
     if (m.rsi < 22) {
       isExhausted = true;
+      const penalty = 100;
+      const res = ["RSI severely oversold (<22) - short trade blocked at extreme exhaustion"];
       return {
         allowed: false,
         regime,
-        scorePenalty: 100,
-        reasons: ["RSI severely oversold (<22) - short trade blocked at extreme exhaustion"],
+        scorePenalty: penalty,
+        adjustedScore: Math.max(0, 100 - penalty),
+        reasons: res,
+        warnings: res,
         blockReason: "EXHAUSTION_RSI_OVERSOLD",
         diagnostics: { regime, isExhausted, isVolumeHealthy: true, isMtfAligned: true, bbBandwidthPct, atrPct, volRatio },
       };
     }
     if (m.rsi < 28 && p < m.bbLower * 0.99) {
       isExhausted = true;
+      const penalty = 100;
+      const res = ["Price extended below lower Bollinger Band with RSI < 28 - oversold risk"];
       return {
         allowed: false,
         regime,
-        scorePenalty: 100,
-        reasons: ["Price extended below lower Bollinger Band with RSI < 28 - oversold risk"],
+        scorePenalty: penalty,
+        adjustedScore: Math.max(0, 100 - penalty),
+        reasons: res,
+        warnings: res,
         blockReason: "EXHAUSTION_BB_LOWER_EXTENDED",
         diagnostics: { regime, isExhausted, isVolumeHealthy: true, isMtfAligned: true, bbBandwidthPct, atrPct, volRatio },
       };
@@ -170,21 +213,25 @@ export function validateMarketConditions(
   // 2. Volume Health Gate
   const isVolumeHealthy = volRatio >= 0.25;
   if (!isVolumeHealthy) {
+    const penalty = 80;
+    const res = ["Volume drought: insufficient market liquidity to execute safely"];
     return {
       allowed: false,
       regime,
-      scorePenalty: 80,
-      reasons: ["Volume drought: insufficient market liquidity to execute safely"],
+      scorePenalty: penalty,
+      adjustedScore: Math.max(0, 100 - penalty),
+      reasons: res,
+      warnings: res,
       blockReason: "VOLUME_DROUGHT",
       diagnostics: { regime, isExhausted, isVolumeHealthy, isMtfAligned: true, bbBandwidthPct, atrPct, volRatio },
     };
   }
 
   // 3. Higher Timeframe (MTF) Bias Alignment
-  const htf = m.htfTrend ? (m.htfTrend === "bull" || m.htfTrend === "up" ? "long" : m.htfTrend === "bear" || m.htfTrend === "down" ? "short" : "neutral") : "neutral";
+  const rawHtf = m.htfTrend ?? m.higherTfTrend;
+  const htf: string = rawHtf ? (rawHtf === "bull" || rawHtf === "up" ? "long" : rawHtf === "bear" || rawHtf === "down" ? "short" : "neutral") : "neutral";
   const isMtfAligned = htf === "neutral" || htf === dir;
   if (!isMtfAligned && htf !== "neutral") {
-    // If trade directly counters HTF macro trend, penalize heavily unless strong reversal confirmation exists
     scorePenalty += 20;
     reasons.push(`Counter-HTF: Trade ${dir} opposes ${htf} macro trend`);
   }
@@ -204,8 +251,8 @@ export function validateMarketConditions(
   }
 
   // 5. Dynamic ATR-Bounded Stop Loss & Take Profit Geometry
-  const minSlDist = Math.max(p * 0.0035, m.atr * 1.1); // minimum 0.35% or 1.1x ATR to prevent noise whipsaws
-  const maxSlDist = Math.max(p * 0.035, m.atr * 3.5);  // maximum 3.5% or 3.5x ATR to prevent unbounded risk
+  const minSlDist = Math.max(p * 0.0035, m.atr * 1.1);
+  const maxSlDist = Math.max(p * 0.035, m.atr * 3.5);
 
   let slDist = Math.abs(p - rawSl);
   let adjustedSl = rawSl;
@@ -220,7 +267,6 @@ export function validateMarketConditions(
     reasons.push("SL capped at maximum safe ATR distance");
   }
 
-  // Ensure TP offers at least minRR
   let tpDist = Math.abs(rawTp - p);
   let adjustedTp = rawTp;
   if (tpDist / slDist < minRR) {
@@ -231,23 +277,29 @@ export function validateMarketConditions(
 
   const finalRR = Number((tpDist / Math.max(1e-9, slDist)).toFixed(2));
 
-  // Exit direction sanity
   if ((dir === "long" && (adjustedSl >= p || adjustedTp <= p)) || (dir === "short" && (adjustedSl <= p || adjustedTp >= p))) {
+    const penalty = 100;
+    const res = ["Invalid exit geometry (SL/TP inverted)"];
     return {
       allowed: false,
       regime,
-      scorePenalty: 100,
-      reasons: ["Invalid exit geometry (SL/TP inverted)"],
+      scorePenalty: penalty,
+      adjustedScore: Math.max(0, 100 - penalty),
+      reasons: res,
+      warnings: res,
       blockReason: "INVALID_EXIT_GEOMETRY",
       diagnostics: { regime, isExhausted, isVolumeHealthy, isMtfAligned, bbBandwidthPct, atrPct, volRatio },
     };
   }
 
+  const adjustedScore = Math.max(0, 100 - scorePenalty);
   return {
     allowed: true,
     regime,
     scorePenalty,
+    adjustedScore,
     reasons,
+    warnings: reasons,
     adjustedSl,
     adjustedTp,
     rr: finalRR,

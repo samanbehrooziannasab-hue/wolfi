@@ -755,7 +755,7 @@ export async function engineTick(): Promise<{ scanned: number; opened: number }>
           macd: lastTf.ind.macd,
           macdSig: lastTf.ind.macdSig,
           volumeRatio: volRatio,
-          higherTfTrend: higherTf?.trend,
+          higherTfTrend: higherTf?.trend as any,
           support: lastTf.sr.support,
           resistance: lastTf.sr.resistance,
         };
@@ -798,8 +798,8 @@ export async function engineTick(): Promise<{ scanned: number; opened: number }>
         }
 
         const side = decision.direction;
-        const sl = validation.adjustedSl;
-        const tp = validation.adjustedTp;
+        const sl = validation.adjustedSl ?? initialSl ?? (side === "long" ? price * 0.98 : price * 1.02);
+        const tp = validation.adjustedTp ?? initialTp ?? (side === "long" ? price * 1.02 : price * 0.98);
         const riskDist = Math.abs(price - sl);
         // Minimum SL distance: 0.15% of entry price (prevents opening and closing at same price)
         const minRiskDist = price * 0.0015;
@@ -1138,7 +1138,7 @@ async function recordLearning(pos: Row, closed: Row, s: any): Promise<void> {
       "You are a trading review assistant. Analyze this closed trade, list 2-3 concrete lessons in the user's language.",
       JSON.stringify({
         symbol: pos.symbol, side: pos.side, entry, exit: closePrice,
-        pnl, reason, strategies, score: num(pos.score), diagnosis: diag.rootCause,
+        pnl, reason, strategies, score: num(pos.score), diagnosis: diag.code,
       }),
       { cacheKey: `review:${pos.id}` }
     ).then((r) => {
