@@ -1748,9 +1748,11 @@ function UserPanel({ token }: { token: string }) {
   const s = S[lang];
   const account = useQuery(api.admin.myAccount, { token });
   const positions = useQuery(api.admin.listOpenPositions, { token });
-  const markets = useQuery(api.markets.listMarkets, {});
+  const marketsRaw = useQuery(api.markets.listMarkets, {});
+  const markets = Array.isArray(marketsRaw) ? marketsRaw : (Array.isArray(marketsRaw?.markets) ? marketsRaw.markets : []);
   const overview = useQuery(api.dashboard.overview, {});
-  const packages = useQuery(api.admin.listVipPackages, {});
+  const packagesRaw = useQuery(api.admin.listVipPackages, {});
+  const packages = Array.isArray(packagesRaw) ? packagesRaw : (Array.isArray(packagesRaw?.packages) ? packagesRaw.packages : []);
   const myTickets = useQuery(api.admin.listMyTickets, { token });
   const referral = useQuery(api.admin.myReferral, { token });
   const signals = useQuery(api.admin.mySignals, { token });
@@ -2918,7 +2920,7 @@ function UserPanel({ token }: { token: string }) {
                 <CardDescription>{s.renew}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
-                {(packages ?? []).filter((p: any) => p.status !== false).map((pkg: any) => (
+                {(Array.isArray(packages) ? packages : (packages?.packages ?? [])).filter((p: any) => p?.status !== false).map((pkg: any) => (
                   <div key={pkg.key} className="rounded-lg border border-gold/25 bg-gradient-to-br from-gold/5 to-transparent p-4 space-y-2">
                     <div className="flex items-center gap-2">
                       <Crown className="size-5 text-gold" />
@@ -3752,7 +3754,7 @@ function UserPanel({ token }: { token: string }) {
 
           {/* ── Fundamental News Section ──────────────────────────────── */}
           <section>
-            <FundamentalNewsSection news={fundamentalNews ?? []} lang={lang} />
+            <FundamentalNewsSection news={Array.isArray(fundamentalNews) ? fundamentalNews : (fundamentalNews?.news ?? [])} lang={lang} />
           </section>
 
           {/* ── positions ──────────────────────────────────────────────── */}
@@ -3842,10 +3844,12 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
   const users = useQuery(api.admin.listUsers, { token });
   const transactions = useQuery(api.admin.listTransactions, { token });
   const vipRequests = useQuery(api.admin.listVipRequests, { token });
-  const packages = useQuery(api.admin.listVipPackages, {});
+  const packagesRaw = useQuery(api.admin.listVipPackages, {});
+  const packages = Array.isArray(packagesRaw) ? packagesRaw : (Array.isArray(packagesRaw?.packages) ? packagesRaw.packages : []);
   const strategies = useQuery(api.strategies.listStrategies, {});
   const strategyPresets = useQuery(api.strategies.listStrategyPresets, {});
-  const markets = useQuery(api.markets.listAllMarkets, {});
+  const marketsRaw = useQuery(api.markets.listAllMarkets, {});
+  const markets = Array.isArray(marketsRaw) ? marketsRaw : (Array.isArray(marketsRaw?.markets) ? marketsRaw.markets : []);
   const settings = useQuery(api.settings.allSettings, {});
   const walletAddresses = useQuery(api.admin.listWalletAddresses, {});
   const exchanges = useQuery(api.admin.listExchangeAccounts, { token });
@@ -4146,12 +4150,14 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
   const engineLogs = useQuery(api.admin.listEngineLogs, { token, level: logLevel && logLevel !== "ALL" ? logLevel : undefined });
   const auditLogs = useQuery(api.admin.listAuditLogs, { token });
   const strategyPerf = useQuery(api.admin.listStrategyPerformance, { token });
-  const allSignals = useQuery(api.admin.mySignals, { token });
+  const allSignalsRaw = useQuery(api.admin.mySignals, { token });
+  const allSignals = Array.isArray(allSignalsRaw) ? allSignalsRaw : (Array.isArray(allSignalsRaw?.signals) ? allSignalsRaw.signals : []);
   const [expSignal, setExpSignal] = useState<string | null>(null);
   const closedPositions = useQuery(api.admin.listClosedPositions, { token });
   const learning = useQuery(api.admin.listLearningHistory, { token });
   const aiUsage = useQuery(api.aiChat.listAiUsage, { token });
-  const aiProviderHealth = useQuery(api.admin.aiProviderHealth, { token });
+  const aiProviderHealthRaw = useQuery(api.admin.aiProviderHealth, { token });
+  const aiProviderHealth = Array.isArray(aiProviderHealthRaw) ? aiProviderHealthRaw : (Array.isArray(aiProviderHealthRaw?.providers) ? aiProviderHealthRaw.providers : []);
   const sendEduChannel = useAction(api.learning.sendEducationToChannel);
   const suggestStrategiesM = useMutation(api.aiChat.suggestStrategies);
   const adminAskWolfAi = useMutation(api.aiChat.askWolfAi);
@@ -4475,7 +4481,8 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
   const toggleVoucher = useMutation(api.coins.toggleVoucher);
   const saveVipPkg = useMutation(api.admin.saveVipPackage);
 
-  const eduAll = useQuery(api.learning.listEducation, { token });
+  const eduAllRaw = useQuery(api.learning.listEducation, { token });
+  const eduAll = Array.isArray(eduAllRaw) ? eduAllRaw : (Array.isArray(eduAllRaw?.days) ? eduAllRaw.days : (Array.isArray(eduAllRaw?.education) ? eduAllRaw.education : []));
   const triggerEdu = useAction(api.learning.triggerEducation);
   const reviewEdu = useMutation(api.learning.reviewEducation);
   const regenEduMedia = useAction(api.learning.regenerateLessonMedia);
@@ -7574,8 +7581,9 @@ export default function Dashboard() {
   const { user, token, isAdmin, isAssistant, logout } = useWolfAuth();
   const s = S[lang];
   const overview = useQuery(api.dashboard.overview, {});
-  const myNotifs = useQuery(api.admin.listNotifications, { token: token ?? "", mine: !isAdmin });
-  const unreadCount = (myNotifs ?? []).filter((n: any) => !n.seen).length;
+  const myNotifsRaw = useQuery(api.admin.listNotifications, { token: token ?? "", mine: !isAdmin });
+  const myNotifs = Array.isArray(myNotifsRaw) ? myNotifsRaw : (Array.isArray(myNotifsRaw?.notifications) ? myNotifsRaw.notifications : []);
+  const unreadCount = myNotifs.filter((n: any) => !n.seen).length;
   const prevUnread = useRef(unreadCount);
   useEffect(() => {
     if (unreadCount > prevUnread.current && unreadCount > 0) {

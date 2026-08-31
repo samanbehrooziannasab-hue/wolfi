@@ -221,6 +221,8 @@ const ROUTES: Record<string, Spec> = {
   "admin:listMyTickets": { m: "GET", p: "/support/tickets", pick: (d) => d?.tickets ?? firstArray(d) },
   "admin:listAllTickets": { m: "GET", p: "/admin/support/tickets", pick: (d) => d?.tickets ?? firstArray(d) },
   "admin:listNotifications": { m: "GET", p: "/notifications", pick: (d) => d?.notifications ?? firstArray(d) },
+  "admin:listFundamentalNews": { m: "GET", p: "/admin/news", pick: (d) => d?.news ?? firstArray(d) },
+  "coins:financialHistory": { m: "GET", p: "/coins/history", pick: (d) => d?.history ?? firstArray(d) },
 
   // ── swapwallet reads ──
   "swapwallet:swapwalletOverview": { m: "GET", p: "/admin/swapwallet", pick: (d) => d },
@@ -261,7 +263,7 @@ const ROUTES: Record<string, Spec> = {
 // Mark every list-shaped route so failed/forbidden reads degrade to []
 // instead of a spinner or a crash.
 for (const k of Object.keys(ROUTES)) {
-  if (/(list|Search|Packages|Chats|Education|Learning|Logs|Tickets|Transactions|Users|Referrals|Addresses|Positions|Predictions|Vouchers|Signals|History|Queries)/i.test(k)) {
+  if (/(list|Search|Packages|Chats|Education|Learning|Logs|Tickets|Transactions|Users|Referrals|Addresses|Positions|Predictions|Vouchers|Signals|History|Queries|News)/i.test(k)) {
     const r = ROUTES[k];
     if (typeof r === "object" && r) r.list = true;
   }
@@ -271,7 +273,8 @@ function routeFor(name: string): Spec {
   if (ROUTES[name]) return ROUTES[name];
   // Sensible generic fallback so an unmapped member still resolves somewhere.
   if (name.startsWith("swapwallet:")) return { m: "POST", p: "/admin/swapwallet/enabled", b: () => ({}) };
-  return { m: "GET", p: "/monitor/health", pick: (d) => d };
+  const isList = /(list|Search|Packages|Chats|Education|Learning|Logs|Tickets|Transactions|Users|Referrals|Addresses|Positions|Predictions|Vouchers|Signals|History|News|Queries)/i.test(name);
+  return { m: "GET", p: "/monitor/health", pick: (d) => (isList ? firstArray(d) : d), list: isList };
 }
 
 function resolveSpec(spec: Spec, args: any): { method: string; path: string; body?: any } {

@@ -29,7 +29,9 @@ export function FundamentalNewsSection({ news = [], lang = "fa" }: FundamentalNe
   const [filter, setFilter] = useState<string>("all");
   const isFa = lang === "fa";
 
-  const filteredNews = news.filter((n) => {
+  const safeNews: any[] = Array.isArray(news) ? news : Array.isArray((news as any)?.news) ? (news as any).news : [];
+
+  const filteredNews = safeNews.filter((n: any) => {
     if (filter === "all") return true;
     return n.category === filter;
   });
@@ -88,7 +90,7 @@ export function FundamentalNewsSection({ news = [], lang = "fa" }: FundamentalNe
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {filteredNews.map((item) => {
+            {filteredNews.map((item: any) => {
               const isBullish = item.sentiment === "bullish";
               const isBearish = item.sentiment === "bearish";
 
