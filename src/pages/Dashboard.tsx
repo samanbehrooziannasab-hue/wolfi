@@ -1346,7 +1346,7 @@ function MiniCandles({ data, overlays }: { data?: any[]; overlays?: Array<{ labe
   const pad = 6;
   const highs = data.map((c) => c.h ?? c.c);
   const lows = data.map((c) => c.l ?? c.o);
-  for (const o of overlays ?? []) for (const v of o.values) if (Number.isFinite(v)) highs.push(v);
+  for (const o of overlays ?? []) for (const v of (o.values ?? [])) if (Number.isFinite(v)) highs.push(v);
   const max = Math.max(...highs);
   const min = Math.min(...lows);
   const span = max - min || 1;
@@ -1369,7 +1369,7 @@ function MiniCandles({ data, overlays }: { data?: any[]; overlays?: Array<{ labe
         );
       })}
       {(overlays ?? []).map((o) => {
-        const pts = o.values
+        const pts = (o.values ?? [])
           .map((v, i) => (Number.isFinite(v) ? `${xAt(i).toFixed(1)},${y(v).toFixed(1)}` : null))
           .filter(Boolean)
           .join(" ");
