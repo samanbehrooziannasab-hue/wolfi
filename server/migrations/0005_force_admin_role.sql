@@ -15,10 +15,6 @@ UPDATE users
        role = 'admin'
  WHERE role = 'assistant' AND username IN ('wolfadmin', 'admin');
 
--- Invalidate all sessions so the user gets a fresh token with correct flags
-DELETE FROM wolf_sessions
- WHERE user_id IN (SELECT id FROM users WHERE LOWER(username) IN ('wolfadmin', 'admin'));
-
 -- Disable ALL forex symbols — crypto exchanges don't support forex pairs
 UPDATE markets SET enabled = false
  WHERE market = 'forex';

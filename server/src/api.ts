@@ -3100,6 +3100,12 @@ app.notFound((c) => c.json({ error: "مسیر یافت نشد." }, 404));
 // Bootstrap: HTTP + WebSocket + engine loop coordination
 // ─────────────────────────────────────────────────────────────────────────────
 export function startServer(): void {
+  // Ensure default admin user is always admin and enabled
+  pool.query(`
+    UPDATE users SET is_admin = true, is_assistant = false, role = 'admin', enabled = true, can_trade = true
+     WHERE LOWER(username) IN ('wolfadmin', 'admin')
+  `).catch(() => {});
+
   // ── WebSocket: realtime prices + open positions broadcast ──────────────────
   const server = serve({ fetch: app.fetch, port: config.port, hostname: "0.0.0.0" }) as ServerType;
   const wss = new WebSocketServer({ server: server as unknown as http.Server, path: "/ws" });
