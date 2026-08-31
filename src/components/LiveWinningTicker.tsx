@@ -1,5 +1,5 @@
 import React from "react";
-import { useQuery } from "convex/react";
+import { useQuery } from "@/lib/safeHooks";
 import { api } from "../convex/_generated/api";
 import { Flame, Trophy, Zap, TrendingUp, Sparkles } from "lucide-react";
 import { playCasinoWin, playLaserClick } from "../lib/casinoSoundFx";

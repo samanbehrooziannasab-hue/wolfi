@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useWolfAuth } from "@/hooks/use-wolf-auth";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation } from "@/lib/safeHooks";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import {

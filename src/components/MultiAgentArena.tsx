@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation } from "@/lib/safeHooks";
 import { api } from "../convex/_generated/api";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
