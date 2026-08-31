@@ -1209,7 +1209,7 @@ export const listNotifications = query({
     const now = Date.now();
     let rows = await ctx.db.query("notifications").order("desc").take(120);
     if (mine) {
-      rows = rows.filter((n) => n.broadcast || n.userId === user._id);
+      rows = rows.filter((n) => (n.broadcast || n.userId === user._id) && !(n.dismissedBy ?? []).includes(user._id));
       // user feed: hide notifications seen more than 24 hours ago, keep
       // everything unseen plus anything seen within the last 24 hours
       rows = rows.filter((n) => !n.seenAt || now - n.seenAt < 24 * 3600 * 1000);
@@ -1221,6 +1221,8 @@ export const listNotifications = query({
       textFa: n.textFa,
       titleEn: n.titleEn,
       textEn: n.textEn,
+      imageUrl: n.imageUrl ?? null,
+      linkUrl: n.linkUrl ?? null,
       broadcast: n.broadcast,
       seen: n.seen,
       seenAt: n.seenAt ?? null,
@@ -1238,11 +1240,16 @@ export const createNotification = mutation({
     textFa: v.optional(v.string()),
     titleEn: v.optional(v.string()),
     textEn: v.optional(v.string()),
+    imageUrl: v.optional(v.string()),
+    linkUrl: v.optional(v.string()),
     broadcast: v.boolean(),
     userId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
     const admin = await requireAdmin(ctx, args.token);
+    if (args.imageUrl && args.imageUrl.length > 10 * 1024 * 1024) {
+      throw new Error("حجم تصویر نباید بیشتر از ۷ مگابایت باشد");
+    }
     const now = Date.now();
     await ctx.db.insert("notifications", {
       userId: args.userId,
@@ -1252,6 +1259,8 @@ export const createNotification = mutation({
       textFa: args.textFa,
       titleEn: args.titleEn,
       textEn: args.textEn,
+      imageUrl: args.imageUrl,
+      linkUrl: args.linkUrl,
       seen: false,
       tgSent: false,
       created: now,
@@ -1270,11 +1279,34 @@ export const createNotification = mutation({
     } else if (args.broadcast) {
       await ctx.scheduler.runAfter(0, internal.notify.notifyChannel, {
         text: `🔔 <b>${args.titleFa}</b>\n${args.textFa ?? ""}`,
-        buttonText: "مشاهده",
+        buttonText: args.linkUrl ? "مشاهده لینک" : "مشاهده",
       });
     }
     await log(ctx, "INFO", "notification.created", `type=${args.type} broadcast=${args.broadcast}`, "api");
     await audit(ctx, "notification.created", admin.username, admin._id, args.titleFa);
+  },
+});
+
+export const deleteNotification = mutation({
+  args: { token: v.string(), id: v.id("notifications") },
+  handler: async (ctx, args) => {
+    const admin = await requireAdmin(ctx, args.token);
+    await ctx.db.delete(args.id);
+    await audit(ctx, "notification.deleted", admin.username, admin._id);
+  },
+});
+
+export const dismissNotification = mutation({
+  args: { token: v.string(), id: v.id("notifications") },
+  handler: async (ctx, args) => {
+    const user = await resolveWolfUser(ctx, args.token);
+    if (!user) throw new Error("session_expired");
+    const n = await ctx.db.get(args.id);
+    if (!n) return;
+    const dismissed = n.dismissedBy ?? [];
+    if (!dismissed.includes(user._id)) {
+      await ctx.db.patch(args.id, { dismissedBy: [...dismissed, user._id] });
+    }
   },
 });
 
@@ -1521,10 +1553,13 @@ export const riskAdvisor = query({
 // ─── support system ───────────────────────────────────────────────────────
 
 export const createTicket = mutation({
-  args: { token: v.string(), subject: v.string(), message: v.string(), priority: v.optional(v.string()) },
+  args: { token: v.string(), subject: v.string(), message: v.string(), priority: v.optional(v.string()), imageUrl: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const user = await resolveWolfUser(ctx, args.token);
     if (!user) throw new Error("session_expired");
+    if (args.imageUrl && args.imageUrl.length > 10 * 1024 * 1024) {
+      throw new Error("حجم تصویر نباید بیشتر از ۷ مگابایت باشد");
+    }
     const subject = args.subject.trim().slice(0, 200);
     const text = args.message.trim().slice(0, 4000);
     if (!subject || !text) throw new Error("موضوع و پیام الزامی است");
@@ -1541,6 +1576,7 @@ export const createTicket = mutation({
       userId: user._id,
       fromAdmin: false,
       text,
+      imageUrl: args.imageUrl,
       created: Date.now(),
     });
     await log(ctx, "INFO", "support.ticket.created", `user=${user.username} ticket=${ticketId}`, "api");
@@ -1608,17 +1644,21 @@ export const listAllTickets = query({
 });
 
 export const replyTicket = mutation({
-  args: { token: v.string(), ticketId: v.id("supportTickets"), text: v.string(), close: v.optional(v.boolean()) },
+  args: { token: v.string(), ticketId: v.id("supportTickets"), text: v.string(), close: v.optional(v.boolean()), imageUrl: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const admin = await requireStaff(ctx, args.token);
+    if (args.imageUrl && args.imageUrl.length > 10 * 1024 * 1024) {
+      throw new Error("حجم تصویر نباید بیشتر از ۷ مگابایت باشد");
+    }
     const text = args.text.trim().slice(0, 4000);
-    if (!text) throw new Error("پیام خالی است");
+    if (!text && !args.imageUrl) throw new Error("پیام خالی است");
     const ticket = await ctx.db.get(args.ticketId);
     if (!ticket) throw new Error("تیکت یافت نشد");
     await ctx.db.insert("supportMessages", {
       ticketId: args.ticketId,
       fromAdmin: true,
-      text,
+      text: text || "تصویر ارسالی",
+      imageUrl: args.imageUrl,
       created: Date.now(),
     });
     await ctx.db.patch(args.ticketId, {
@@ -1639,22 +1679,44 @@ export const setTicketStatus = mutation({
   },
 });
 
-/** User replies to their own ticket (ping-pong) and can close it. */
-export const userReplyTicket = mutation({
-  args: { token: v.string(), ticketId: v.id("supportTickets"), text: v.string(), close: v.optional(v.boolean()) },
+export const deleteTicket = mutation({
+  args: { token: v.string(), ticketId: v.id("supportTickets") },
   handler: async (ctx, args) => {
     const user = await resolveWolfUser(ctx, args.token);
     if (!user) throw new Error("session_expired");
+    const ticket = await ctx.db.get(args.ticketId);
+    if (!ticket) throw new Error("تیکت یافت نشد");
+    const staff = await resolveStaff(ctx, args.token);
+    if (!staff && ticket.userId !== user._id) throw new Error("دسترسی غیرمجاز");
+    const msgs = await ctx.db.query("supportMessages").withIndex("by_ticket", (q: any) => q.eq("ticketId", args.ticketId)).collect();
+    for (const m of msgs) await ctx.db.delete(m._id);
+    await ctx.db.delete(args.ticketId);
+    if (staff) {
+      await audit(ctx, "support.ticket.deleted", staff.username, staff._id, String(args.ticketId));
+    }
+  },
+});
+
+/** User replies to their own ticket (ping-pong) and can close it. */
+export const userReplyTicket = mutation({
+  args: { token: v.string(), ticketId: v.id("supportTickets"), text: v.string(), close: v.optional(v.boolean()), imageUrl: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const user = await resolveWolfUser(ctx, args.token);
+    if (!user) throw new Error("session_expired");
+    if (args.imageUrl && args.imageUrl.length > 10 * 1024 * 1024) {
+      throw new Error("حجم تصویر نباید بیشتر از ۷ مگابایت باشد");
+    }
     const text = args.text.trim().slice(0, 4000);
-    if (!text) throw new Error("پیام خالی است");
+    if (!text && !args.imageUrl) throw new Error("پیام خالی است");
     const ticket = await ctx.db.get(args.ticketId);
     if (!ticket || ticket.userId !== user._id) throw new Error("تیکت یافت نشد");
-    if (ticket.status === "closed") throw new Error("این تیکت بسته شده است");
+    if (ticket.status === "closed" && !args.close) throw new Error("این تیکت بسته شده است");
     await ctx.db.insert("supportMessages", {
       ticketId: args.ticketId,
       userId: user._id,
       fromAdmin: false,
-      text,
+      text: text || "تصویر ارسالی",
+      imageUrl: args.imageUrl,
       created: Date.now(),
     });
     await ctx.db.patch(args.ticketId, {

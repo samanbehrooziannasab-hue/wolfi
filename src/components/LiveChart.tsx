@@ -90,6 +90,7 @@ const YAHOO_REST = "https://query1.finance.yahoo.com/v8/finance/chart";
 export function LiveChart({
   candles: candlesProp,
   levels: levelsProp,
+  indicators,
   width,
   height = 280,
   className = "",
@@ -249,10 +250,7 @@ export function LiveChart({
   if (stopLoss) levels.push({ price: stopLoss, color: "#ef4444", label: "SL", lineStyle: 2 });
   if (takeProfit) levels.push({ price: takeProfit, color: "#10b981", label: "TP", lineStyle: 2 });
 
-  const chartRef = useRef<IChartApi | null>(null);
-  const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const indicatorSeriesRef = useRef<Map<string, ISeriesApi<"Line">>>(new Map());
-  const levelsRef = useRef<any[]>([]);
 
   useEffect(() => {
     if (!containerRef.current) return;

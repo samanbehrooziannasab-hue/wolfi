@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useWolfAuth } from "@/hooks/use-wolf-auth";
-import { useConvexQuery, useConvexMutation } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import {
   Card,
@@ -35,7 +35,7 @@ interface Props {
 }
 
 export function InteractiveStrategyEducation({ className }: Props) {
-  const { sessionToken, isAdmin } = useWolfAuth();
+  const { token, isAdmin } = useWolfAuth();
   const [activeTab, setActiveTab] = useState<"strategies" | "hyperopt" | "research" | "interactive_quiz">("strategies");
   const [selectedStrategy, setSelectedStrategy] = useState<string>("breakout");
   const [quizAnswer, setQuizAnswer] = useState<number | null>(null);
