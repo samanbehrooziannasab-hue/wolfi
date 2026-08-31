@@ -75,14 +75,25 @@ else
 fi
 # The self-hosted server ALWAYS builds the REST frontend — never fall back to
 # the Convex app on a VPS (it cannot log in without a Convex deployment).
+step "Build frontend (dist/)…"
+if [ -d dist ]; then
+  chmod -R u+w dist 2>/dev/null || true
+  rm -rf dist 2>/dev/null || sudo rm -rf dist 2>/dev/null || true
+fi
 export VITE_BACKEND=rest
 export VITE_API_URL="${VITE_API_URL:-/api}"
 if [ "$BUN" = "1" ]; then
   bun run build
-  (cd server && bun run build)
+  (cd server && {
+    if [ -d dist ]; then chmod -R u+w dist 2>/dev/null || true; rm -rf dist 2>/dev/null || true; fi
+    bun run build
+  })
 else
   npm run build
-  (cd server && npm run build)
+  (cd server && {
+    if [ -d dist ]; then chmod -R u+w dist 2>/dev/null || true; rm -rf dist 2>/dev/null || true; fi
+    npm run build
+  })
 fi
 
 # ── publish the built frontend to the nginx web root ──────────────────────
