@@ -1496,23 +1496,30 @@ function UserDetailCard({ token, userId, lang, onClose, readOnly = false }: { to
       </CardHeader>
 
       <CardContent className="space-y-4">
-        <div className="grid gap-2 sm:grid-cols-3">
-          {[
-            ["USDT", detail.balances.usdt, "text-emerald-300"],
-            ["تومان / Toman", detail.balances.toman, "text-gold"],
-            [s.coinsBalance, detail.balances.wolfCoins, "text-cyan-300"],
-          ].map(([label, val, tone]) => (
-            <div key={String(label)} className="rounded-md border border-border/50 bg-background/40 p-2.5">
-              <p className="text-[10px] text-muted-foreground">{label}</p>
-              <p className={`terminal-font mt-0.5 text-lg font-bold tabular-nums ${tone}`} dir="ltr">{Number(val).toLocaleString("en-US")}</p>
-            </div>
-          ))}
-        </div>
-        <p className="text-[11px] text-muted-foreground">
-          {s.realizedPnl}: <span dir="ltr" className="terminal-font">{money(detail.balances.realizedPnl)}</span>
-          {u?.vipExpiresAt ? <> · VIP تا <span dir="ltr">{new Date(u.vipExpiresAt).toLocaleDateString(lang === "fa" ? "fa-IR" : "en-US")}</span></> : null}
-          {u?.enabled === false ? <> · <span className="text-red-300">{s.blocked}</span></> : null}
-        </p>
+        {(() => {
+          const balances = detail?.balances ?? { usdt: 0, toman: 0, wolfCoins: 0, realizedPnl: 0 };
+          return (
+            <>
+              <div className="grid gap-2 sm:grid-cols-3">
+                {[
+                  ["USDT", balances.usdt ?? 0, "text-emerald-300"],
+                  ["تومان / Toman", balances.toman ?? 0, "text-gold"],
+                  [s.coinsBalance, balances.wolfCoins ?? 0, "text-cyan-300"],
+                ].map(([label, val, tone]) => (
+                  <div key={String(label)} className="rounded-md border border-border/50 bg-background/40 p-2.5">
+                    <p className="text-[10px] text-muted-foreground">{label}</p>
+                    <p className={`terminal-font mt-0.5 text-lg font-bold tabular-nums ${tone}`} dir="ltr">{Number(val ?? 0).toLocaleString("en-US")}</p>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                {s.realizedPnl}: <span dir="ltr" className="terminal-font">{money(balances.realizedPnl ?? 0)}</span>
+                {u?.vipExpiresAt ? <> · VIP تا <span dir="ltr">{new Date(u.vipExpiresAt).toLocaleDateString(lang === "fa" ? "fa-IR" : "en-US")}</span></> : null}
+                {u?.enabled === false ? <> · <span className="text-red-300">{s.blocked}</span></> : null}
+              </p>
+            </>
+          );
+        })()}
 
         <div className="grid gap-3 lg:grid-cols-2">
           {!readOnly && (

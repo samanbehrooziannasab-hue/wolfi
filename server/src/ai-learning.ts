@@ -397,8 +397,12 @@ export async function sendEducationToChannel(
   const s = await getSettings();
   const botToken = s["telegram.token"] ?? "";
   if (!botToken) throw new Error("توکن ربات تلگرام تنظیم نشده است (اتصالات)");
-  const chatId = lang === "fa" ? String(s["telegram.channelId"] ?? "") : String(s["telegram.channelEnId"] ?? "");
-  if (!chatId) throw new Error(lang === "fa" ? "آیدی کانال فارسی تنظیم نشده است" : "English channel ID is not set (Connections)");
+  const chatId = (
+    lang === "fa"
+      ? String(s["telegram.channelId"] || s["channel.id"] || s["channel.username"] || "").trim()
+      : String(s["telegram.channelEnId"] || s["channel.enId"] || s["channel.enUsername"] || "").trim()
+  );
+  if (!chatId) throw new Error(lang === "fa" ? "شناسه یا یوزرنیم کانال تلگرام تنظیم نشده است (از بخش تنظیمات کانال)" : "Channel ID/Username is not set");
   const row = await one<Row>("SELECT * FROM education WHERE id = $1", [id]);
   if (!row) throw new Error("درس پیدا نشد");
   const title = lang === "fa" ? row.title_fa : row.title_en || row.title_fa;
@@ -411,13 +415,17 @@ export async function sendEducationToChannel(
   let photoId: number | null = null;
   if (row.image) {
     try {
-      photoId = await sendPhoto(chatId, row.image, `📚 <b>${escHtml(title)}</b> — 🐺 WOLF AI`, { parseMode: "HTML" });
+      if (row.image.startsWith("http://") || row.image.startsWith("https://")) {
+        photoId = await sendPhoto(chatId, row.image, `📚 <b>${escHtml(title)}</b> — 🐺 WOLF AI`, { parseMode: "HTML" });
+      }
     } catch (e: any) {
       console.warn(`[education] photo failed: ${e?.message ?? e}`);
     }
   }
   const messageId = await sendMessage(chatId, text, { parseMode: "HTML" });
-  if (!messageId) throw new Error("ارسال به کانال ناموفق بود");
+  if (!messageId) {
+    throw new Error(`ارسال پیام به کانال (${chatId}) ناموفق بود. اطمینان حاصل کنید ربات در کانال ادمین است و شناسه کانال صحیح است.`);
+  }
   if (row.audio) {
     try {
       await sendAudio(chatId, row.audio, `🎧 ${escHtml(title)}`, { parseMode: "HTML" });

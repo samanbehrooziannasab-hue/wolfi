@@ -69,10 +69,22 @@ async function restCall<T = any>(
   try { data = await res.json(); } catch { /* empty */ }
   if (!res.ok) {
     if (res.status === 401) clearSessionAndGoLogin();
-    const fallback = res.status === 502
-      ? "اتصال وبهوک از سمت تلگرام/پروکسی ناموفق شد (502). وضعیت API، گواهی HTTPS و مسیر /telegram/webhook را بررسی کنید."
-      : `http_${res.status}`;
-    const err = new Error(String(data?.error ?? data?.message ?? fallback)) as any;
+    const statusMap: Record<number, string> = {
+      400: "اطلاعات یا درخواست ورودی نامعتبر است (400)",
+      401: "نشست کاری منقضی شده است؛ لطفاً دوباره وارد شوید (401)",
+      403: "شما دسترسی لازم برای این عملیات را ندارید (403)",
+      404: "مورد درخواستی یا مسیر پیدا نشد (404)",
+      409: "تداخل اطلاعات — کاربر یا داده‌ای با این مشخصات از قبل وجود دارد (409)",
+      429: "تعداد درخواست‌ها بیش از حد مجاز است، کمی صبر کنید (429)",
+      500: "خطای داخلی سرور (500) — وضعیت دیتابیس و پارامترها را بررسی کنید",
+      502: "اتصال سرور/پروکسی ناموفق شد (502). وضعیت وب‌سرور و سرویس‌ها را بررسی کنید.",
+      503: "سرویس موقتاً در دسترس نیست (503)",
+      504: "زمان پاسخگویی سرور به پایان رسید (504)",
+    };
+    const fallback = statusMap[res.status] ?? `خطای شبکه/سرور (کد ${res.status})`;
+    const rawMsg = data?.error ?? data?.message;
+    const msg = (rawMsg && typeof rawMsg === "string" && rawMsg.trim()) ? rawMsg.trim() : fallback;
+    const err = new Error(msg) as any;
     err.status = res.status;
     throw err;
   }

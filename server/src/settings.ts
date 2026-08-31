@@ -442,7 +442,7 @@ export async function setSetting(
      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value,
        group_name = EXCLUDED.group_name, updated_at = EXCLUDED.updated_at,
        updated_by = EXCLUDED.updated_by`,
-    [key, JSON.stringify(value), group, now(), updatedBy ?? null]
+    [key, JSON.stringify(value ?? null), group, now(), updatedBy ?? null]
   );
 }
 

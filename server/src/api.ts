@@ -2505,13 +2505,27 @@ app.patch("/api/admin/vip/packages/:key", requireAdmin, async (c) => {
     sets.push(`${col} = $${vals.length + 1}`);
     vals.push(v);
   };
+  if (body.name !== undefined) push("name", clean(body.name, 100));
+  if (body.name_fa !== undefined || body.nameFa !== undefined) push("name_fa", clean(body.name_fa ?? body.nameFa, 100));
   if (body.price !== undefined) push("price", num(body.price));
-  if (body.duration_days !== undefined) push("duration_days", num(body.duration_days));
-  if (body.min_capital !== undefined) push("min_capital", num(body.min_capital));
-  if (body.max_capital !== undefined) push("max_capital", num(body.max_capital));
+  if (body.duration_days !== undefined || body.durationDays !== undefined) push("duration_days", num(body.duration_days ?? body.durationDays));
+  if (body.min_capital !== undefined || body.minCapital !== undefined) push("min_capital", num(body.min_capital ?? body.minCapital));
+  if (body.max_capital !== undefined || body.maxCapital !== undefined) push("max_capital", num(body.max_capital ?? body.maxCapital));
   if (body.status !== undefined) push("status", !!body.status);
-  if (body.features !== undefined) push("features", JSON.stringify(body.features));
-  if (body.risk_disclosure !== undefined) push("risk_disclosure", clean(body.risk_disclosure, 4000));
+  
+  if (body.features !== undefined) {
+    const raw = body.features;
+    const arr = Array.isArray(raw) ? raw : (typeof raw === "string" ? raw.split("\n") : []);
+    push("features", arr.map((x: any) => String(x).trim()).filter(Boolean));
+  }
+  if (body.features_fa !== undefined || body.featuresFa !== undefined) {
+    const raw = body.features_fa ?? body.featuresFa;
+    const arr = Array.isArray(raw) ? raw : (typeof raw === "string" ? raw.split("\n") : []);
+    push("features_fa", arr.map((x: any) => String(x).trim()).filter(Boolean));
+  }
+  if (body.risk_disclosure !== undefined || body.riskDisclosure !== undefined) push("risk_disclosure", clean(body.risk_disclosure ?? body.riskDisclosure, 4000));
+  if (body.terms !== undefined) push("terms", clean(body.terms, 4000));
+
   if (sets.length === 0) return c.json({ error: "هیچ فیلدی ارسال نشد." }, 400);
   await pool.query(`UPDATE vip_packages SET ${sets.join(", ")} WHERE key = $1`, vals);
   await audit("vip_package_update", admin.username, admin.id, "vip", { key });
@@ -2987,12 +3001,39 @@ app.post("/api/admin/telegram/send", requireAdmin, async (c) => {
   const s = (await getSettings()) as unknown as Record<string, any>;
   // Test mode "bot": send to the owner admin id configured in settings.
   if (body.test === "bot") {
-    const chatId = String(body.chatId ?? s["telegram.adminId"] ?? "");
-    if (!chatId) return c.json({ error: "admin_id_not_set" }, 400);
-    const mid = await sendMessage(chatId, text, { parseMode: "HTML" });
-    if (!mid) return c.json({ error: "telegram_send_failed" }, 502);
-    await audit("telegram_admin_send", admin.username, admin.id, "telegram", { test: "bot", chatId });
-    return c.json({ ok: true, messageId: mid });
+    const botToken = String(s["telegram.token"] ?? "").trim();
+    if (!botToken) return c.json({ ok: false, error: "توکن ربات تلگرام تنظیم نشده است." });
+
+    let botInfo: { username?: string } | null = null;
+    try {
+      const res = await fetch(`https://api.telegram.org/bot${botToken}/getMe`).then((r) => r.json() as Promise<any>);
+      if (res?.ok && res.result) botInfo = { username: res.result.username };
+    } catch { /* ignore */ }
+
+    const rawAdminId = String(body.chatId || s["telegram.adminId"] || "").trim();
+    const adminIdNum = Number(rawAdminId);
+    const hasAdminId = Boolean(rawAdminId && rawAdminId !== "0" && !isNaN(adminIdNum) && adminIdNum !== 0);
+
+    let adminSent: { ok: boolean; reason?: string; adminIdPresent: boolean } = {
+      ok: false,
+      reason: hasAdminId ? "user_must_start_bot" : "no_admin_id",
+      adminIdPresent: hasAdminId,
+    };
+
+    if (hasAdminId) {
+      const mid = await sendMessage(rawAdminId, text || "تست اتصال ربات Trading Wolf AI 🐺", { parseMode: "HTML" });
+      if (mid) {
+        adminSent = { ok: true, reason: "sent", adminIdPresent: true };
+      }
+    }
+
+    await audit("telegram_admin_send", admin.username, admin.id, "telegram", { test: "bot", adminId: rawAdminId });
+    return c.json({
+      ok: botInfo != null,
+      bot: botInfo,
+      adminSent,
+      adminId: rawAdminId,
+    });
   }
   // Test mode "channels": post to both configured channel ids.
   if (body.test === "channels") {
