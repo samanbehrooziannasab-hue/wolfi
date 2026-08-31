@@ -19,6 +19,7 @@ import { MARKET_DEFS, fetchBitgetKlines, fetchBybitKlines, fetchCoinexKlines, fe
 import { getSettingsMap, getSetting, setSetting } from "./settings";
 import { requireAdmin } from "./wolfAuth";
 import { effectiveCapital, exchangeScale, sizedNotional } from "./capital";
+import { validateMarketConditions, type MarketMetrics } from "./marketValidator";
 
 const SIZING_TFS = ["15m", "1h"];
 
@@ -237,6 +238,36 @@ async function scan(ctx: any): Promise<void> {
         ) {
           continue;
         }
+        const dir = aggregate.direction as "long" | "short";
+        const rawSl = dir === "long" ? features.price - features.atrV * stopATR : features.price + features.atrV * stopATR;
+        const rawTp = dir === "long" ? features.price + features.atrV * tp1ATR : features.price - features.atrV * tp1ATR;
+        const stratFamilies = aggregate.contribution.map((c: any) => c.key);
+
+        const marketMetrics: MarketMetrics = {
+          price: features.price,
+          ema9: features.ema9,
+          ema21: features.ema21,
+          ema50: features.ema50,
+          rsi: features.rsi14,
+          atr: features.atrV,
+          bbUpper: features.bbUpper,
+          bbLower: features.bbLower,
+          bbMid: features.bbMid,
+          volLast: features.volLast,
+          volAvg: features.volAvg,
+          trend: features.trend,
+        };
+
+        const validation = validateMarketConditions(dir, marketMetrics, rawSl, rawTp, stratFamilies, passRR);
+        if (!validation.allowed) {
+          continue;
+        }
+
+        const adjustedScore = Math.max(0, aggregate.score - validation.scorePenalty);
+        if (adjustedScore < passScore) {
+          continue;
+        }
+
         // ── BLOCK: never open on a symbol that already has an open position
         if (openSymbols.has(m.symbol)) {
           continue;
@@ -252,8 +283,8 @@ async function scan(ctx: any): Promise<void> {
           timeframe: tf,
           entry: features.price,
           features,
-          aggregate,
-          strategies: aggregate.contribution.map((c: any) => c.key).slice(0, 6),
+          aggregate: { ...aggregate, score: adjustedScore },
+          strategies: stratFamilies.slice(0, 6),
           network: (m as any).network,
         });
         found++;
@@ -733,6 +764,22 @@ async function monitorOpenPositions(
 
     let stopLoss = p.stopLoss;
     let takeProfit = p.takeProfit;
+
+    // ── AUTOMATED BREAKEVEN & DYNAMIC PROFIT LOCK ──────────────────────
+    // When price moves favorably by >= 0.8% or reaches 50% toward TP1,
+    // lock in Breakeven (entry + 0.1% buffer to guarantee zero loss).
+    const profitRatio = p.entry ? (p.side === "long" ? (price - p.entry) / p.entry : (p.entry - price) / p.entry) : 0;
+    if (profitRatio >= 0.008) {
+      const bePrice = p.side === "long" ? p.entry * 1.001 : p.entry * 0.999;
+      if (p.side === "long" && bePrice > stopLoss) stopLoss = bePrice;
+      if (p.side === "short" && bePrice < stopLoss) stopLoss = bePrice;
+    }
+    // Dynamic Profit Lock: if trade gains >= 2.0%, secure at least 50% of the gain
+    if (profitRatio >= 0.02) {
+      const lockPrice = p.side === "long" ? p.entry * (1 + profitRatio * 0.5) : p.entry * (1 - profitRatio * 0.5);
+      if (p.side === "long" && lockPrice > stopLoss) stopLoss = lockPrice;
+      if (p.side === "short" && lockPrice < stopLoss) stopLoss = lockPrice;
+    }
 
     if (trailing) {
       const prevBest = trailingBySymbol.get(p.symbol) ?? (p.side === "long" ? p.current : p.current);

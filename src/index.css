@@ -100,65 +100,65 @@
   color-scheme: dark;
 }
 
-/* ─── light variant (warm greige — noticeably deeper, never white) ────── */
+/* ─── light variant (clean, modern light slate canvas with emerald accents) ────── */
 .light {
   --radius: 0.625rem;
   color-scheme: light;
 
-  /* warm grey-tinted — soft on the eyes, still clearly a light theme */
-  --background: oklch(0.89 0.012 256);
-  --foreground: oklch(0.17 0.022 258);
-  --card: oklch(0.935 0.009 256);
-  --card-foreground: oklch(0.17 0.022 258);
-  --popover: oklch(0.935 0.009 256);
-  --popover-foreground: oklch(0.17 0.022 258);
+  /* crisp, clean modern surfaces */
+  --background: oklch(0.985 0.004 250);
+  --foreground: oklch(0.18 0.02 260);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.02 260);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.02 260);
 
-  /* deeper emerald for readability on grey */
-  --primary: oklch(0.37 0.1 168);
-  --primary-foreground: oklch(0.97 0.005 256);
-  --secondary: oklch(0.85 0.011 256);
-  --secondary-foreground: oklch(0.24 0.02 258);
-  --muted: oklch(0.85 0.011 256);
-  --muted-foreground: oklch(0.42 0.017 254);
-  --accent: oklch(0.83 0.017 228);
-  --accent-foreground: oklch(0.2 0.02 228);
-  --destructive: oklch(0.5 0.16 25);
-  --border: oklch(0.74 0.015 256);
-  --input: oklch(0.74 0.015 256);
-  --ring: oklch(0.37 0.1 168 / 40%);
+  /* vibrant emerald green */
+  --primary: oklch(0.52 0.15 162);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.955 0.006 250);
+  --secondary-foreground: oklch(0.22 0.02 260);
+  --muted: oklch(0.955 0.006 250);
+  --muted-foreground: oklch(0.48 0.02 255);
+  --accent: oklch(0.945 0.015 220);
+  --accent-foreground: oklch(0.2 0.03 220);
+  --destructive: oklch(0.55 0.2 25);
+  --border: oklch(0.91 0.006 250);
+  --input: oklch(0.91 0.006 250);
+  --ring: oklch(0.52 0.15 162 / 35%);
 
-  --chart-1: oklch(0.4 0.12 168);
-  --chart-2: oklch(0.52 0.11 84);
-  --chart-3: oklch(0.48 0.1 225);
-  --chart-4: oklch(0.48 0.09 300);
-  --chart-5: oklch(0.5 0.16 25);
+  --chart-1: oklch(0.52 0.15 162);
+  --chart-2: oklch(0.65 0.14 84);
+  --chart-3: oklch(0.55 0.12 225);
+  --chart-4: oklch(0.55 0.12 300);
+  --chart-5: oklch(0.55 0.2 25);
 
-  --sidebar: oklch(0.87 0.011 256);
-  --sidebar-foreground: oklch(0.2 0.02 258);
-  --sidebar-primary: oklch(0.37 0.1 168);
-  --sidebar-primary-foreground: oklch(0.97 0.005 256);
-  --sidebar-accent: oklch(0.83 0.011 256);
-  --sidebar-accent-foreground: oklch(0.2 0.02 258);
-  --sidebar-border: oklch(0.78 0.013 256);
-  --sidebar-ring: oklch(0.37 0.1 168 / 40%);
+  --sidebar: oklch(0.975 0.005 250);
+  --sidebar-foreground: oklch(0.2 0.02 260);
+  --sidebar-primary: oklch(0.52 0.15 162);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.945 0.008 250);
+  --sidebar-accent-foreground: oklch(0.2 0.02 260);
+  --sidebar-border: oklch(0.92 0.006 250);
+  --sidebar-ring: oklch(0.52 0.15 162 / 35%);
 
-  --gold: oklch(0.5 0.11 84);
-  --gold-soft: oklch(0.5 0.11 84 / 16%);
-  --info: oklch(0.43 0.09 225);
-  --wolf: oklch(0.35 0.02 258);
+  --gold: oklch(0.62 0.14 84);
+  --gold-soft: oklch(0.62 0.14 84 / 12%);
+  --info: oklch(0.5 0.12 225);
+  --wolf: oklch(0.42 0.02 260);
 
-  /* signal shades — dark enough on grey */
-  --color-emerald-300: oklch(0.38 0.1 168);
-  --color-emerald-400: oklch(0.4 0.11 168);
-  --color-emerald-500: oklch(0.42 0.12 168);
-  --color-red-300: oklch(0.5 0.16 25);
-  --color-red-400: oklch(0.52 0.18 25);
-  --color-cyan-300: oklch(0.42 0.09 225);
-  --color-cyan-400: oklch(0.45 0.1 225);
-  --color-amber-300: oklch(0.48 0.1 84);
-  --color-amber-400: oklch(0.5 0.11 84);
-  --color-violet-300: oklch(0.45 0.09 300);
-  --color-violet-400: oklch(0.47 0.1 300);
+  /* signal shades */
+  --color-emerald-300: oklch(0.48 0.13 162);
+  --color-emerald-400: oklch(0.52 0.15 162);
+  --color-emerald-500: oklch(0.46 0.16 162);
+  --color-red-300: oklch(0.55 0.18 25);
+  --color-red-400: oklch(0.52 0.2 25);
+  --color-cyan-300: oklch(0.48 0.12 225);
+  --color-cyan-400: oklch(0.45 0.14 225);
+  --color-amber-300: oklch(0.58 0.14 84);
+  --color-amber-400: oklch(0.55 0.15 84);
+  --color-violet-300: oklch(0.52 0.12 300);
+  --color-violet-400: oklch(0.48 0.14 300);
 }
 
 @layer base {

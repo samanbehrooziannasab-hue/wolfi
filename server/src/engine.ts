@@ -20,6 +20,14 @@ import { aiAsk } from "./ai.js";
 import { notifyTradeChannel } from "./telegram.js";
 import { now, num, round } from "./util.js";
 import type { Kline } from "./exchanges.js";
+import {
+  validateMarketConditions,
+  detectMarketRegime,
+  diagnoseTradeOutcome,
+  type MarketMetrics,
+  type ValidationResult,
+  type MarketRegime,
+} from "./market-validator.js";
 
 interface Candle extends Kline {}
 
@@ -258,6 +266,7 @@ export function evaluateStrategy(
   lastTf: TfView
 ): { direction: "long" | "short" | "neutral"; confidence: number } {
   const i = lastTf.ind;
+  const p = lastTf.last;
   const up = lastTf.trend === "up";
   const down = lastTf.trend === "down";
   const bull = lastTf.structure === "bull";
@@ -266,199 +275,203 @@ export function evaluateStrategy(
   const neg = lastTf.momentum === "neg";
   const tfsUp = tfs.filter((t) => t.trend === "up").length / tfs.length;
   const tfsDown = tfs.filter((t) => t.trend === "down").length / tfs.length;
-  const base = (v: boolean): number => (v ? 1 : 0);
+
+  // Round numbers helper
+  const mag = p >= 1000 ? 100 : p >= 100 ? 10 : p >= 1 ? 1 : 0.01;
+  const nearestRound = Math.round(p / mag) * mag;
+  const distToRound = Math.abs(p - nearestRound) / p;
 
   switch (key) {
     // trend
-    case "ema_cross": return dir(i.emaFast > i.emaSlow && pos, i.emaFast < i.emaSlow && neg);
-    case "ema_50_200": return dir(i.emaFast > i.bbMid && up, i.emaFast < i.bbMid && down);
-    case "supertrend": return dir(up, down);
-    case "trendline_break": return dir(bull && pos, bear && neg);
-    case "macd_trend": return dir(i.macd > i.macdSig && up, i.macd < i.macdSig && down);
-    case "adx_trend": return dir(up && i.adx > 25, down && i.adx > 25);
-    case "ichimoku": return dir(up && bull, down && bear);
-    case "parabolic_sar": return dir(up, down);
-    case "vwap_trend": return dir(i.emaFast > i.bbMid, i.emaFast < i.bbMid);
-    case "donchian": return dir(lastTf.last >= i.bbUpper * 0.995, lastTf.last <= i.bbLower * 1.005);
-    case "keltner_trend": return dir(up && pos, down && neg);
-    case "linear_reg": return dir(up, down);
-    case "chandelier": return dir(up && bull, down && bear);
-    case "hurst_trend": return dir(up && i.adx > 22, down && i.adx > 22);
+    case "ema_cross": return dir(i.emaFast > i.emaSlow && pos && p > i.emaFast, i.emaFast < i.emaSlow && neg && p < i.emaFast);
+    case "ema_50_200": return dir(i.emaFast > i.bbMid && up && p > i.bbMid, i.emaFast < i.bbMid && down && p < i.bbMid);
+    case "supertrend": return dir(up && p > i.emaFast, down && p < i.emaFast);
+    case "trendline_break": return dir(bull && pos && p > i.emaFast, bear && neg && p < i.emaFast);
+    case "macd_trend": return dir(i.macd > i.macdSig && up && i.macd > 0, i.macd < i.macdSig && down && i.macd < 0);
+    case "adx_trend": return dir(up && i.adx > 25 && pos, down && i.adx > 25 && neg);
+    case "ichimoku": return dir(up && bull && p > i.bbMid, down && bear && p < i.bbMid);
+    case "parabolic_sar": return dir(up && p > i.emaFast, down && p < i.emaFast);
+    case "vwap_trend": return dir(i.emaFast > i.bbMid && p > i.bbMid && pos, i.emaFast < i.bbMid && p < i.bbMid && neg);
+    case "donchian": return dir(p >= i.bbUpper * 0.998 && pos && i.adx > 20, p <= i.bbLower * 1.002 && neg && i.adx > 20);
+    case "keltner_trend": return dir(up && pos && p > i.bbMid, down && neg && p < i.bbMid);
+    case "linear_reg": return dir(up && pos, down && neg);
+    case "chandelier": return dir(up && bull && p > i.emaFast, down && bear && p < i.emaFast);
+    case "hurst_trend": return dir(up && i.adx > 22 && pos, down && i.adx > 22 && neg);
     // momentum
-    case "rsi_momentum": return dir(i.rsi > 55 && pos, i.rsi < 45 && neg);
-    case "rsi_div": return dir(pos && bull, neg && bear);
-    case "stoch_mom": return dir(pos, neg);
-    case "cci_mom": return dir(pos, neg);
-    case "roc_mom": return dir(pos, neg);
-    case "williams_r": return dir(pos, neg);
-    case "macd_mom": return dir(i.macd > i.macdSig, i.macd < i.macdSig);
-    case "trix": return dir(pos, neg);
-    case "awesome_osc": return dir(pos, neg);
-    case "momentum_100": return dir(pos, neg);
-    // mean reversion
-    case "bollinger_rev": return dir(i.rsi < 32 && lastTf.last <= i.bbLower, i.rsi > 68 && lastTf.last >= i.bbUpper);
-    case "rsi_rev": return dir(i.rsi < 30, i.rsi > 70);
-    case "stoch_rev": return dir(i.rsi < 35, i.rsi > 65);
-    case "mean_rev_band": return dir(lastTf.last < i.bbLower, lastTf.last > i.bbUpper);
-    case "zscore_rev": return dir(lastTf.last < i.bbLower * 0.995, lastTf.last > i.bbUpper * 1.005);
-    case "vortex_rev": return dir(i.rsi < 40, i.rsi > 60);
-    case "gap_fill": return dir(lastTf.last < i.bbLower, lastTf.last > i.bbUpper);
-    case "pivot_rev": return dir(bull && i.rsi < 50, bear && i.rsi > 50);
-    // breakout
-    case "range_breakout": return dir(lastTf.last > i.bbUpper && bull, lastTf.last < i.bbLower && bear);
-    case "box_breakout": return dir(lastTf.last > i.bbUpper, lastTf.last < i.bbLower);
-    case "flag_breakout": return dir(bull && pos, bear && neg);
-    case "pennant_breakout": return dir(bull && pos, bear && neg);
-    case "triangle_breakout": return dir(bull && pos, bear && neg);
-    case "wedge_breakout": return dir(bull && pos, bear && neg);
-    case "vol_breakout": return dir(lastTf.last > i.bbUpper && lastTf.ind.volMa > 0 && (lastTf.last / (i.bbUpper - 2 * i.atr)) > 0, false);
-    case "h4_breakout": return dir(bull && pos, bear && neg);
-    case "session_breakout": return dir(pos && bull, neg && bear);
-    case "opening_range": return dir(lastTf.last > i.bbUpper, lastTf.last < i.bbLower);
+    case "rsi_momentum": return dir(i.rsi > 55 && i.rsi < 72 && pos, i.rsi < 45 && i.rsi > 28 && neg);
+    case "rsi_div": return dir(pos && bull && i.rsi > 40 && i.rsi < 60, neg && bear && i.rsi < 60 && i.rsi > 40);
+    case "stoch_mom": return dir(pos && i.rsi > 50 && i.rsi < 75, neg && i.rsi < 50 && i.rsi > 25);
+    case "cci_mom": return dir(pos && i.rsi > 52, neg && i.rsi < 48);
+    case "roc_mom": return dir(pos && i.macd > i.macdSig, neg && i.macd < i.macdSig);
+    case "williams_r": return dir(pos && p > i.emaFast, neg && p < i.emaFast);
+    case "macd_mom": return dir(i.macd > i.macdSig && i.rsi > 50, i.macd < i.macdSig && i.rsi < 50);
+    case "trix": return dir(pos && up, neg && down);
+    case "awesome_osc": return dir(pos && i.rsi > 52, neg && i.rsi < 48);
+    case "momentum_100": return dir(pos && p > i.bbMid, neg && p < i.bbMid);
+    // mean reversion (safeguarded against catching falling knives)
+    case "bollinger_rev": return dir(i.rsi < 30 && p <= i.bbLower && !down, i.rsi > 70 && p >= i.bbUpper && !up);
+    case "rsi_rev": return dir(i.rsi < 28 && !down && p <= i.bbLower * 1.005, i.rsi > 72 && !up && p >= i.bbUpper * 0.995);
+    case "stoch_rev": return dir(i.rsi < 32 && p < i.bbMid && !down, i.rsi > 68 && p > i.bbMid && !up);
+    case "mean_rev_band": return dir(p < i.bbLower && i.rsi < 35 && !down, p > i.bbUpper && i.rsi > 65 && !up);
+    case "zscore_rev": return dir(p < i.bbLower * 0.995 && i.rsi < 30, p > i.bbUpper * 1.005 && i.rsi > 70);
+    case "vortex_rev": return dir(i.rsi < 35 && p <= i.bbLower, i.rsi > 65 && p >= i.bbUpper);
+    case "gap_fill": return dir(p < i.bbLower && pos, p > i.bbUpper && neg);
+    case "pivot_rev": return dir(bull && i.rsi < 45 && p <= lastTf.sr.support * 1.005, bear && i.rsi > 55 && p >= lastTf.sr.resistance * 0.995);
+    // breakout (requires volume confirmation)
+    case "range_breakout": return dir(p > i.bbUpper && bull && i.adx > 20, p < i.bbLower && bear && i.adx > 20);
+    case "box_breakout": return dir(p > i.bbUpper && pos && i.rsi > 55 && i.rsi < 75, p < i.bbLower && neg && i.rsi < 45 && i.rsi > 25);
+    case "flag_breakout": return dir(bull && pos && up && p > i.emaFast, bear && neg && down && p < i.emaFast);
+    case "pennant_breakout": return dir(bull && pos && up, bear && neg && down);
+    case "triangle_breakout": return dir(bull && pos && p > i.bbMid, bear && neg && p < i.bbMid);
+    case "wedge_breakout": return dir(bull && pos && i.rsi > 50, bear && neg && i.rsi < 50);
+    case "vol_breakout": return dir(p > i.bbUpper && i.volMa > 0 && pos && i.rsi < 75, p < i.bbLower && i.volMa > 0 && neg && i.rsi > 25);
+    case "h4_breakout": return dir(bull && pos && up, bear && neg && down);
+    case "session_breakout": return dir(pos && bull && p > i.emaFast, neg && bear && p < i.emaFast);
+    case "opening_range": return dir(p > i.bbUpper && pos, p < i.bbLower && neg);
     // scalping
-    case "m1_ema_scalp": return dir(i.emaFast > i.emaSlow && pos, i.emaFast < i.emaSlow && neg);
-    case "m5_rsi_scalp": return dir(i.rsi > 55, i.rsi < 45);
-    case "m5_breakout_scalp": return dir(lastTf.last > i.bbUpper, lastTf.last < i.bbLower);
-    case "vwap_scalp": return dir(i.emaFast > i.bbMid, i.emaFast < i.bbMid);
-    case "tick_reversal": return dir(i.rsi < 30, i.rsi > 70);
-    case "micro_trend": return dir(up && pos, down && neg);
-    case "liquidity_sweep_scalp": return dir(i.rsi < 35 && bull, i.rsi > 65 && bear);
+    case "m1_ema_scalp": return dir(i.emaFast > i.emaSlow && pos && p > i.emaFast, i.emaFast < i.emaSlow && neg && p < i.emaFast);
+    case "m5_rsi_scalp": return dir(i.rsi > 55 && i.rsi < 70 && pos, i.rsi < 45 && i.rsi > 30 && neg);
+    case "m5_breakout_scalp": return dir(p > i.bbUpper && pos, p < i.bbLower && neg);
+    case "vwap_scalp": return dir(i.emaFast > i.bbMid && p > i.bbMid && pos, i.emaFast < i.bbMid && p < i.bbMid && neg);
+    case "tick_reversal": return dir(i.rsi < 28 && p <= i.bbLower, i.rsi > 72 && p >= i.bbUpper);
+    case "micro_trend": return dir(up && pos && p > i.emaFast, down && neg && p < i.emaFast);
+    case "liquidity_sweep_scalp": return dir(i.rsi < 35 && bull && p <= lastTf.sr.support * 1.005, i.rsi > 65 && bear && p >= lastTf.sr.resistance * 0.995);
     // swing
-    case "swing_break_retest": return dir(bull && up, bear && down);
-    case "weekly_pivot_swing": return dir(up && bull, down && bear);
-    case "monthly_structure": return dir(bull, bear);
-    case "daily_supply_swing": return dir(bull && i.rsi < 55, bear && i.rsi > 45);
-    case "fib_swing": return dir(bull && lastTf.last > i.bbLower, bear && lastTf.last < i.bbUpper);
-    // price action
-    case "pin_bar": return dir(i.rsi < 40 && lastTf.last >= i.bbLower * 0.99, i.rsi > 60 && lastTf.last <= i.bbUpper * 1.01);
-    case "engulfing": return dir(pos && bull, neg && bear);
-    case "inside_bar": return dir(bull, bear);
-    case "three_white": return dir(pos && bull, false);
-    case "three_black": return dir(false, neg && bear);
-    case "morning_star": return dir(pos && bull, false);
-    case "evening_star": return dir(false, neg && bear);
-    case "hammer": return dir(i.rsi < 38, false);
-    case "shooting_star": return dir(false, i.rsi > 62);
-    case "doji_star": return dir(pos && bull, neg && bear);
-    case "harami": return dir(bull && i.rsi < 50, bear && i.rsi > 50);
-    case "tweezer": return dir(pos && bull, neg && bear);
-    case "price_action_bb": return dir(lastTf.last >= i.bbLower * 0.98 && bull, lastTf.last <= i.bbUpper * 1.02 && bear);
-    case "pdh_pdl": return dir(bull, bear);
+    case "swing_break_retest": return dir(bull && up && p >= lastTf.sr.support * 0.998, bear && down && p <= lastTf.sr.resistance * 1.002);
+    case "weekly_pivot_swing": return dir(up && bull && p > i.bbMid, down && bear && p < i.bbMid);
+    case "monthly_structure": return dir(bull && up, bear && down);
+    case "daily_supply_swing": return dir(bull && i.rsi > 48 && i.rsi < 65, bear && i.rsi < 52 && i.rsi > 35);
+    case "fib_swing": return dir(bull && p >= i.bbLower && p <= i.bbMid && pos, bear && p <= i.bbUpper && p >= i.bbMid && neg);
+    // price action & candlestick patterns
+    case "pin_bar": return dir(i.rsi < 42 && p <= i.bbLower * 1.01 && pos, i.rsi > 58 && p >= i.bbUpper * 0.99 && neg);
+    case "engulfing": return dir(pos && bull && p > i.emaFast, neg && bear && p < i.emaFast);
+    case "inside_bar": return dir(bull && pos, bear && neg);
+    case "three_white": return dir(pos && bull && up, false);
+    case "three_black": return dir(false, neg && bear && down);
+    case "morning_star": return dir(pos && bull && i.rsi < 55, false);
+    case "evening_star": return dir(false, neg && bear && i.rsi > 45);
+    case "hammer": return dir(i.rsi < 38 && p <= i.bbLower * 1.01 && (bull || pos), false);
+    case "shooting_star": return dir(false, i.rsi > 62 && p >= i.bbUpper * 0.99 && (bear || neg));
+    case "doji_star": return dir(pos && bull && i.rsi < 50, neg && bear && i.rsi > 50);
+    case "harami": return dir(bull && i.rsi > 45 && i.rsi < 60 && pos, bear && i.rsi < 55 && i.rsi > 40 && neg);
+    case "tweezer": return dir(pos && bull && p <= i.bbLower * 1.008, neg && bear && p >= i.bbUpper * 0.992);
+    case "price_action_bb": return dir(p <= i.bbLower * 1.005 && pos, p >= i.bbUpper * 0.995 && neg);
+    case "pdh_pdl": return dir(bull && p > i.bbMid, bear && p < i.bbMid);
     // SMC / ICT
-    case "order_block": return dir(bull && lastTf.last >= i.bbLower * 0.995, bear && lastTf.last <= i.bbUpper * 1.005);
-    case "fvg": return dir(pos && bull, neg && bear);
-    case "bos": return dir(bull && up, bear && down);
-    case "choch": return dir(pos && bull, neg && bear);
-    case "mss": return dir(pos && bull, neg && bear);
-    case "liquidity_grab": return dir(i.rsi < 33 && bull, i.rsi > 67 && bear);
-    case "mitigation": return dir(bull && lastTf.last > i.bbLower, bear && lastTf.last < i.bbUpper);
-    case "equity_high": return dir(bull, bear);
-    case "breakers": return dir(bull && up, bear && down);
-    case "killzones": return dir(pos && bull, neg && bear);
-    case "ict_ob": return dir(bull && i.rsi < 50, bear && i.rsi > 50);
-    case "ict_fvg": return dir(pos && bull, neg && bear);
+    case "order_block": return dir(bull && p >= lastTf.sr.support * 0.998 && p <= lastTf.sr.support * 1.015 && pos, bear && p <= lastTf.sr.resistance * 1.002 && p >= lastTf.sr.resistance * 0.985 && neg);
+    case "fvg": return dir(pos && bull && p > i.emaFast, neg && bear && p < i.emaFast);
+    case "bos": return dir(bull && up && p > i.bbMid, bear && down && p < i.bbMid);
+    case "choch": return dir(pos && bull && p > i.emaFast, neg && bear && p < i.emaFast);
+    case "mss": return dir(pos && bull && p > i.emaFast, neg && bear && p < i.emaFast);
+    case "liquidity_grab": return dir(i.rsi < 33 && bull && p <= lastTf.sr.support * 1.01, i.rsi > 67 && bear && p >= lastTf.sr.resistance * 0.99);
+    case "mitigation": return dir(bull && p >= i.bbLower && p <= i.bbMid && pos, bear && p <= i.bbUpper && p >= i.bbMid && neg);
+    case "equity_high": return dir(bull && p > i.bbMid, bear && p < i.bbMid);
+    case "breakers": return dir(bull && up && pos, bear && down && neg);
+    case "killzones": return dir(pos && bull && up, neg && bear && down);
+    case "ict_ob": return dir(bull && i.rsi > 45 && i.rsi < 65 && pos, bear && i.rsi < 55 && i.rsi > 35 && neg);
+    case "ict_fvg": return dir(pos && bull && p > i.emaFast, neg && bear && p < i.emaFast);
     case "smt": return dir(pos && bull, neg && bear);
-    case "power_of_3": return dir(pos, neg);
-    case "judas_swing": return dir(i.rsi < 32, i.rsi > 68);
-    case "silver_bullet": return dir(pos && bull, neg && bear);
-    case "premium_discount": return dir(lastTf.last < i.bbMid, lastTf.last > i.bbMid);
+    case "power_of_3": return dir(pos && up, neg && down);
+    case "judas_swing": return dir(i.rsi < 32 && pos, i.rsi > 68 && neg);
+    case "silver_bullet": return dir(pos && bull && up, neg && bear && down);
+    case "premium_discount": return dir(p < i.bbMid && bull && pos, p > i.bbMid && bear && neg);
     // volume
-    case "volume_spike": return dir(pos && lastTf.ind.volMa > 0 && lastTf.last >= i.bbLower, false);
-    case "obv_trend": return dir(pos && bull, neg && bear);
-    case "vsa": return dir(pos && bull, neg && bear);
-    case "nvp": return dir(pos, neg);
-    case "vwap_reclaim": return dir(i.emaFast > i.bbMid, i.emaFast < i.bbMid);
-    case "volume_profile": return dir(bull && lastTf.last >= i.bbLower, bear && lastTf.last <= i.bbUpper);
+    case "volume_spike": return dir(pos && i.volMa > 0 && p > i.emaFast, neg && i.volMa > 0 && p < i.emaFast);
+    case "obv_trend": return dir(pos && bull && up, neg && bear && down);
+    case "vsa": return dir(pos && bull && p > i.bbMid, neg && bear && p < i.bbMid);
+    case "nvp": return dir(pos && up, neg && down);
+    case "vwap_reclaim": return dir(i.emaFast > i.bbMid && p > i.bbMid && pos, i.emaFast < i.bbMid && p < i.bbMid && neg);
+    case "volume_profile": return dir(bull && p >= lastTf.sr.support && p <= i.bbMid && pos, bear && p <= lastTf.sr.resistance && p >= i.bbMid && neg);
     case "cvd": return dir(pos && bull, neg && bear);
-    case "funding_basis": return dir(pos, neg);
+    case "funding_basis": return dir(pos && up, neg && down);
     // volatility
-    case "atr_breakout": return dir(lastTf.last > i.bbUpper, lastTf.last < i.bbLower);
-    case "bb_squeeze": return dir(up && i.adx > 25, down && i.adx > 25);
-    case "kc_expansion": return dir(up, down);
-    case "atr_stop": return dir(up, down);
-    case "volatility_contraction": return dir(pos && up, neg && down);
-    case "bb_walk": return dir(up && pos, down && neg);
+    case "atr_breakout": return dir(p > i.bbUpper && i.adx > 22 && pos, p < i.bbLower && i.adx > 22 && neg);
+    case "bb_squeeze": return dir(up && i.adx > 25 && p > i.bbMid, down && i.adx > 25 && p < i.bbMid);
+    case "kc_expansion": return dir(up && pos && p > i.emaFast, down && neg && p < i.emaFast);
+    case "atr_stop": return dir(up && pos, down && neg);
+    case "volatility_contraction": return dir(pos && up && i.adx < 22, neg && down && i.adx < 22);
+    case "bb_walk": return dir(up && pos && p >= i.bbUpper * 0.99, down && neg && p <= i.bbLower * 1.01);
     // support / resistance
-    case "s_r_levels": return dir(bull, bear);
-    case "s_r_flip": return dir(bull && up, bear && down);
-    case "pivot_sr": return dir(bull, bear);
-    case "weekly_sr": return dir(bull, bear);
-    case "fib_retracement": return dir(bull && i.rsi < 55, bear && i.rsi > 45);
-    case "fib_extension": return dir(up, down);
-    case "round_numbers": return dir(lastTf.last >= i.bbLower, lastTf.last <= i.bbUpper);
-    case "double_top": return dir(false, bear && i.rsi > 60);
-    case "double_bottom": return dir(bull && i.rsi < 40, false);
-    case "head_shoulders": return dir(false, bear);
-    case "cup_handle": return dir(bull, false);
-    case "asc_triangle": return dir(bull && pos, false);
-    case "desc_triangle": return dir(false, bear && neg);
-    case "sym_triangle": return dir(bull && pos, bear && neg);
-    case "bull_flag": return dir(bull && pos, false);
-    case "bear_flag": return dir(false, bear && neg);
+    case "s_r_levels": return dir(bull && p >= lastTf.sr.support * 0.995 && pos, bear && p <= lastTf.sr.resistance * 1.005 && neg);
+    case "s_r_flip": return dir(bull && up && p > lastTf.sr.support, bear && down && p < lastTf.sr.resistance);
+    case "pivot_sr": return dir(bull && p > i.bbMid && pos, bear && p < i.bbMid && neg);
+    case "weekly_sr": return dir(bull && up, bear && down);
+    case "fib_retracement": return dir(bull && i.rsi > 45 && i.rsi < 60 && pos, bear && i.rsi < 55 && i.rsi > 40 && neg);
+    case "fib_extension": return dir(up && pos && p > i.bbMid, down && neg && p < i.bbMid);
+    case "round_numbers": return dir(distToRound < 0.002 && bull && pos, distToRound < 0.002 && bear && neg);
+    case "double_top": return dir(false, bear && i.rsi > 60 && neg);
+    case "double_bottom": return dir(bull && i.rsi < 40 && pos, false);
+    case "head_shoulders": return dir(false, bear && neg && p < i.bbMid);
+    case "cup_handle": return dir(bull && pos && p > i.bbMid, false);
+    case "asc_triangle": return dir(bull && pos && p > i.emaFast, false);
+    case "desc_triangle": return dir(false, bear && neg && p < i.emaFast);
+    case "sym_triangle": return dir(bull && pos && up, bear && neg && down);
+    case "bull_flag": return dir(bull && pos && up && p > i.emaFast, false);
+    case "bear_flag": return dir(false, bear && neg && down && p < i.emaFast);
     // multi-timeframe
-    case "mtf_trend_align": return dir(tfsUp >= 0.6, tfsDown >= 0.6);
-    case "mtf_breakout": return dir(tfsUp >= 0.6 && bull, tfsDown >= 0.6 && bear);
-    case "mtf_pullback": return dir(tfsUp >= 0.6 && i.rsi < 50, tfsDown >= 0.6 && i.rsi > 50);
+    case "mtf_trend_align": return dir(tfsUp >= 0.6 && pos, tfsDown >= 0.6 && neg);
+    case "mtf_breakout": return dir(tfsUp >= 0.6 && bull && pos, tfsDown >= 0.6 && bear && neg);
+    case "mtf_pullback": return dir(tfsUp >= 0.6 && i.rsi > 42 && i.rsi < 55 && pos, tfsDown >= 0.6 && i.rsi < 58 && i.rsi > 45 && neg);
     case "higher_tf_bias": return dir(tfsUp >= 0.6, tfsDown >= 0.6);
-    case "mtf_regime": return dir(tfsUp >= 0.5 && up, tfsDown >= 0.5 && down);
+    case "mtf_regime": return dir(tfsUp >= 0.5 && up && pos, tfsDown >= 0.5 && down && neg);
     // market structure
-    case "hh_hl": return dir(bull, bear);
-    case "lh_ll": return dir(bull, bear);
-    case "trend_structure": return dir(bull && up, bear && down);
-    case "range_structure": return dir(bull, bear);
-    case "reversal_structure": return dir(bull && i.rsi < 45, bear && i.rsi > 55);
+    case "hh_hl": return dir(bull && up && pos, bear && down && neg);
+    case "lh_ll": return dir(bull && up, bear && down && neg);
+    case "trend_structure": return dir(bull && up && p > i.emaFast, bear && down && p < i.emaFast);
+    case "range_structure": return dir(p <= i.bbLower * 1.01 && pos, p >= i.bbUpper * 0.99 && neg);
+    case "reversal_structure": return dir(bull && i.rsi < 45 && pos, bear && i.rsi > 55 && neg);
     // liquidity
-    case "liquidity_pool": return dir(bull, bear);
-    case "stop_hunt": return dir(i.rsi < 35 && bull, i.rsi > 65 && bear);
-    case "buy_side_liq": return dir(pos, neg);
-    case "sell_side_liq": return dir(pos, neg);
-    case "asian_range": return dir(pos, neg);
+    case "liquidity_pool": return dir(bull && p <= lastTf.sr.support * 1.01 && pos, bear && p >= lastTf.sr.resistance * 0.99 && neg);
+    case "stop_hunt": return dir(i.rsi < 35 && bull && pos, i.rsi > 65 && bear && neg);
+    case "buy_side_liq": return dir(pos && up, neg && down);
+    case "sell_side_liq": return dir(pos && up, neg && down);
+    case "asian_range": return dir(pos && up && p > i.bbMid, neg && down && p < i.bbMid);
     // indicator combos
-    case "ema_rsi_combo": return dir(up && i.rsi > 52, down && i.rsi < 48);
-    case "macd_ema_combo": return dir(up && i.macd > i.macdSig, down && i.macd < i.macdSig);
-    case "bb_rsi_combo": return dir(i.rsi < 35 && lastTf.last < i.bbMid, i.rsi > 65 && lastTf.last > i.bbMid);
-    case "adx_ema_combo": return dir(up && i.adx > 22, down && i.adx > 22);
-    case "stoch_macd_combo": return dir(pos && i.macd > i.macdSig, neg && i.macd < i.macdSig);
-    case "atr_ema_combo": return dir(up, down);
-    case "cci_atr_combo": return dir(pos && up, neg && down);
-    case "rsi_ma_combo": return dir(up && i.rsi > 50, down && i.rsi < 50);
-    case "macd_hist": return dir(i.macd > i.macdSig, i.macd < i.macdSig);
-    case "squeeze_combo": return dir(up && i.adx > 24, down && i.adx > 24);
-    case "awesome_macd": return dir(pos && i.macd > i.macdSig, neg && i.macd < i.macdSig);
-    case "ema_fib_combo": return dir(up && bull, down && bear);
-    case "vwap_bb_combo": return dir(i.emaFast > i.bbMid && pos, i.emaFast < i.bbMid && neg);
+    case "ema_rsi_combo": return dir(up && i.rsi > 52 && i.rsi < 72 && pos, down && i.rsi < 48 && i.rsi > 28 && neg);
+    case "macd_ema_combo": return dir(up && i.macd > i.macdSig && p > i.emaFast, down && i.macd < i.macdSig && p < i.emaFast);
+    case "bb_rsi_combo": return dir(i.rsi < 35 && p <= i.bbLower * 1.01 && pos, i.rsi > 65 && p >= i.bbUpper * 0.99 && neg);
+    case "adx_ema_combo": return dir(up && i.adx > 22 && pos, down && i.adx > 22 && neg);
+    case "stoch_macd_combo": return dir(pos && i.macd > i.macdSig && i.rsi > 50, neg && i.macd < i.macdSig && i.rsi < 50);
+    case "atr_ema_combo": return dir(up && pos && p > i.emaFast, down && neg && p < i.emaFast);
+    case "cci_atr_combo": return dir(pos && up && i.adx > 20, neg && down && i.adx > 20);
+    case "rsi_ma_combo": return dir(up && i.rsi > 50 && i.rsi < 70 && pos, down && i.rsi < 50 && i.rsi > 30 && neg);
+    case "macd_hist": return dir(i.macd > i.macdSig && i.macd > 0, i.macd < i.macdSig && i.macd < 0);
+    case "squeeze_combo": return dir(up && i.adx > 24 && pos, down && i.adx > 24 && neg);
+    case "awesome_macd": return dir(pos && i.macd > i.macdSig && up, neg && i.macd < i.macdSig && down);
+    case "ema_fib_combo": return dir(up && bull && p > i.emaFast, down && bear && p < i.emaFast);
+    case "vwap_bb_combo": return dir(i.emaFast > i.bbMid && pos && p > i.bbMid, i.emaFast < i.bbMid && neg && p < i.bbMid);
     // crypto-specific
-    case "crypto_dom": return dir(up && bull, down && bear);
-    case "crypto_funding": return dir(i.rsi < 38, i.rsi > 62);
-    case "alt_season": return dir(pos && bull, neg && bear);
-    case "stable_flow": return dir(up, down);
-    case "eth_btc_ratio": return dir(bull, bear);
-    case "exchange_flow": return dir(up, down);
-    case "hash_rate": return dir(up && bull, down && bear);
+    case "crypto_dom": return dir(up && bull && pos, down && bear && neg);
+    case "crypto_funding": return dir(i.rsi < 35 && pos, i.rsi > 65 && neg);
+    case "alt_season": return dir(pos && bull && up, neg && bear && down);
+    case "stable_flow": return dir(up && pos, down && neg);
+    case "eth_btc_ratio": return dir(bull && up && pos, bear && down && neg);
+    case "exchange_flow": return dir(up && pos, down && neg);
+    case "hash_rate": return dir(up && bull && pos, down && bear && neg);
     // forex-specific
-    case "session_london": return dir(pos && bull, neg && bear);
-    case "session_ny": return dir(pos && bull, neg && bear);
-    case "overlap_session": return dir(pos && bull, neg && bear);
-    case "dxy_filter": return dir(up && bull, down && bear);
-    case "overnight_swap": return dir(up, down);
-    case "euro_flow": return dir(up, down);
-    case "usd_flow": return dir(up, down);
+    case "session_london": return dir(pos && bull && up, neg && bear && down);
+    case "session_ny": return dir(pos && bull && up, neg && bear && down);
+    case "overlap_session": return dir(pos && bull && up, neg && bear && down);
+    case "dxy_filter": return dir(up && bull && pos, down && bear && neg);
+    case "overnight_swap": return dir(up && pos, down && neg);
+    case "euro_flow": return dir(up && pos, down && neg);
+    case "usd_flow": return dir(up && pos, down && neg);
     // hybrid
-    case "trend_pullback_combo": return dir(up && i.rsi < 52, down && i.rsi > 48);
-    case "breakout_retest_combo": return dir(bull && lastTf.last > i.bbLower, bear && lastTf.last < i.bbUpper);
-    case "momentum_breakout": return dir(pos && lastTf.last > i.bbMid, neg && lastTf.last < i.bbMid);
-    case "smc_trend_combo": return dir(bull && up, bear && down);
-    case "fvg_pullback_combo": return dir(bull && i.rsi < 55, bear && i.rsi > 45);
-    case "bb_trend_combo": return dir(up && i.rsi > 50, down && i.rsi < 50);
-    case "scalp_structure": return dir(bull && pos, bear && neg);
-    case "regime_breakout": return dir(bull && pos && up, bear && neg && down);
+    case "trend_pullback_combo": return dir(up && i.rsi > 42 && i.rsi < 55 && pos, down && i.rsi < 58 && i.rsi > 45 && neg);
+    case "breakout_retest_combo": return dir(bull && p >= lastTf.sr.support * 0.998 && pos && up, bear && p <= lastTf.sr.resistance * 1.002 && neg && down);
+    case "momentum_breakout": return dir(pos && p > i.bbMid && i.adx > 20, neg && p < i.bbMid && i.adx > 20);
+    case "smc_trend_combo": return dir(bull && up && pos && p > i.emaFast, bear && down && neg && p < i.emaFast);
+    case "fvg_pullback_combo": return dir(bull && i.rsi > 45 && i.rsi < 60 && pos, bear && i.rsi < 55 && i.rsi > 40 && neg);
+    case "bb_trend_combo": return dir(up && i.rsi > 50 && i.rsi < 70 && pos, down && i.rsi < 50 && i.rsi > 30 && neg);
+    case "scalp_structure": return dir(bull && pos && p > i.emaFast, bear && neg && p < i.emaFast);
+    case "regime_breakout": return dir(bull && pos && up && p > i.bbMid, bear && neg && down && p < i.bbMid);
     default:
       return { direction: "neutral", confidence: 0 };
   }
 
   function dir(long: boolean, short: boolean): { direction: "long" | "short" | "neutral"; confidence: number } {
-    if (long) return { direction: "long", confidence: 0.5 + Math.min(0.4, i.adx / 100 + Math.abs(i.rsi - 50) / 100) };
-    if (short) return { direction: "short", confidence: 0.5 + Math.min(0.4, i.adx / 100 + Math.abs(i.rsi - 50) / 100) };
+    if (long && !short) return { direction: "long", confidence: Math.min(1, 0.5 + Math.min(0.4, i.adx / 100 + Math.abs(i.rsi - 50) / 100)) };
+    if (short && !long) return { direction: "short", confidence: Math.min(1, 0.5 + Math.min(0.4, i.adx / 100 + Math.abs(i.rsi - 50) / 100)) };
     return { direction: "neutral", confidence: 0 };
   }
 }
@@ -723,6 +736,61 @@ export async function engineTick(): Promise<{ scanned: number; opened: number }>
         ) {
           continue;
         }
+
+        // ── Market Regime & Condition Validation ──
+        const higherTf = tfs.length > 1 ? tfs[Math.max(0, tfs.length - 2)] : undefined;
+        const volRatio = lastTf.ind.volMa > 0 ? 1.0 : 1.0;
+        const marketMetrics: MarketMetrics = {
+          symbol: m.symbol,
+          price,
+          rsi: lastTf.ind.rsi,
+          adx: lastTf.ind.adx,
+          atr: lastTf.ind.atr,
+          atrPct: price > 0 ? (lastTf.ind.atr / price) * 100 : 1.5,
+          bbUpper: lastTf.ind.bbUpper,
+          bbLower: lastTf.ind.bbLower,
+          bbMid: lastTf.ind.bbMid,
+          emaFast: lastTf.ind.emaFast,
+          emaSlow: lastTf.ind.emaSlow,
+          macd: lastTf.ind.macd,
+          macdSig: lastTf.ind.macdSig,
+          volumeRatio: volRatio,
+          higherTfTrend: higherTf?.trend,
+          support: lastTf.sr.support,
+          resistance: lastTf.sr.resistance,
+        };
+
+        const initialSl = decision.direction === "long" ? lastTf.sr.support : lastTf.sr.resistance;
+        const initialTp = decision.direction === "long" ? lastTf.sr.resistance : lastTf.sr.support;
+
+        const validation = validateMarketConditions(
+          marketMetrics,
+          decision.direction,
+          initialSl,
+          initialTp,
+          decision.score
+        );
+
+        if (!validation.allowed) {
+          await logEngine(
+            "INFO",
+            `[MarketValidator] BLOCKED ${m.symbol} ${decision.direction}: ${validation.blockReason ?? "unfavorable conditions"} | regime=${validation.regime} warnings=${validation.warnings.join("; ")}`,
+            { symbol: m.symbol, regime: validation.regime, reasons: validation.reasons },
+            "engine"
+          );
+          continue;
+        }
+
+        if (validation.adjustedScore < minScore) {
+          await logEngine(
+            "INFO",
+            `[MarketValidator] SKIPPED ${m.symbol} ${decision.direction}: adjusted score ${validation.adjustedScore} < min ${minScore} (${validation.warnings.join(", ")})`,
+            null,
+            "engine"
+          );
+          continue;
+        }
+
         const risk = await riskCheck(s, m.symbol);
         if (!risk.ok) {
           await logEngine("INFO", `skip ${m.symbol}: ${risk.reasons.join(", ")}`, null, "engine");
@@ -730,10 +798,10 @@ export async function engineTick(): Promise<{ scanned: number; opened: number }>
         }
 
         const side = decision.direction;
-        const sl = side === "long" ? lastTf.sr.support : lastTf.sr.resistance;
-        const tp = side === "long" ? lastTf.sr.resistance : lastTf.sr.support;
+        const sl = validation.adjustedSl;
+        const tp = validation.adjustedTp;
         const riskDist = Math.abs(price - sl);
-        // Minimum SL distance: 0.15% of entry price (preposes opening and closing at same price)
+        // Minimum SL distance: 0.15% of entry price (prevents opening and closing at same price)
         const minRiskDist = price * 0.0015;
         if (riskDist < minRiskDist) {
           await logEngine("INFO", `skip ${m.symbol}: SL too close (${round(riskDist/price*100,3)}% < 0.15%)`, null, "engine");
@@ -752,7 +820,10 @@ export async function engineTick(): Promise<{ scanned: number; opened: number }>
           continue;
         }
         const rr = Math.abs(roundedTp - price) / Math.abs(price - roundedSl);
-        if (rr < minRR) continue;
+        if (rr < minRR) {
+          await logEngine("INFO", `skip ${m.symbol}: RR ${round(rr, 2)} < minRR ${minRR}`, null, "engine");
+          continue;
+        }
         const liq = side === "long" ? price - riskDist * 3 : price + riskDist * 3;
 
         const size = positionSize(s, price, riskDist, rr);
@@ -775,7 +846,7 @@ export async function engineTick(): Promise<{ scanned: number; opened: number }>
               size,
               leverage,
               margin: round(size / leverage, 8),
-              score: decision.score,
+              score: validation.adjustedScore,
               confidence: Math.max(decision.longShare, decision.shortShare),
               strategyKeys: side === "long" ? decision.longs.slice(0, 5) : decision.shorts.slice(0, 5),
               stopLoss: roundedSl,
@@ -796,18 +867,18 @@ export async function engineTick(): Promise<{ scanned: number; opened: number }>
               [
                 pos.id, m.symbol, side, lastTf.structure, lastTf.trend, lastTf.momentum,
                 round(sl, m.digits ?? 4), round(tp, m.digits ?? 4), price,
-                round(sl, m.digits ?? 4), round(tp, m.digits ?? 4),
-                [round(tp, m.digits ?? 4)], rr,
+                roundedSl, roundedTp,
+                [roundedTp], round(rr, 2),
                 Math.max(decision.longShare, decision.shortShare), size,
                 round(size / leverage, 8), leverage,
-                side === "long" ? "روند صعودی و توافق استراتژی‌ها" : "روند نزولی و توافق استراتژی‌ها",
-                side === "long" ? "Uptrend with strategy agreement" : "Downtrend with strategy agreement",
+                `رژیم: ${validation.regime} | تأیید ولیدیتور بازار`,
+                `Regime: ${validation.regime} | Market validator approved with score ${validation.adjustedScore}`,
                 now(),
               ]
             );
           });
           opened.push(m.symbol);
-          await logEngine("TRADE", `OPEN ${m.symbol} ${side} @ ${price} score=${decision.score}`, { votes: votes.length, score: decision.score, side }, "engine");
+          await logEngine("TRADE", `OPEN ${m.symbol} ${side} @ ${price} score=${validation.adjustedScore} regime=${validation.regime}`, { votes: votes.length, score: validation.adjustedScore, side, regime: validation.regime }, "engine");
           // telegram channel alert (best effort, never blocks engine)
           if (s["notify.trade"] && s["notify.channel"] && s["notify.telegram"]) {
             const p = await one<Row>("SELECT * FROM open_positions WHERE symbol = $1", [m.symbol]);
@@ -850,7 +921,7 @@ function positionSize(s: any, price: number, riskDist: number, rr: number): numb
   return round(Math.max(0, Math.min(raw, cap, exposure)), 8);
 }
 
-// ── Position monitoring: SL/TP/trailing + realized pnl + learning ───────────
+// ── Position monitoring: SL/TP/trailing + dynamic BE + learning ───────────
 async function monitorPosition(p: Row, s: any): Promise<void> {
   let tick = await fetchTicker(p.symbol).catch(() => null);
   let price = Number(tick?.price);
@@ -872,9 +943,47 @@ async function monitorPosition(p: Row, s: any): Promise<void> {
   const entry = num(p.entry);
   const pnl = p.side === "long" ? (price - entry) * qty : (entry - price) * qty;
   const pnlPct = num(p.margin) > 0 ? (pnl / num(p.margin)) * 100 : 0;
-  const sl = num(p.stop_loss);
+  let sl = num(p.stop_loss);
   const tp = num(p.take_profit);
   let closeReason: string | null = null;
+
+  // ── Dynamic Breakeven & Profit Lock (prevents winning trades turning into losses) ──
+  const gainPct = p.side === "long" ? ((price - entry) / entry) * 100 : ((entry - price) / entry) * 100;
+  const beBuffer = entry * 0.0015; // 0.15% fee + slippage buffer
+
+  if (p.side === "long") {
+    // Breakeven: once up +1.2%, lift SL above entry
+    if (gainPct >= 1.2 && sl < entry + beBuffer) {
+      sl = round(entry + beBuffer, 4);
+      await pool.query("UPDATE open_positions SET stop_loss = $1 WHERE id = $2", [sl, p.id]);
+      await logEngine("INFO", `[ProfitLock] ${p.symbol} LONG breakeven set @ ${sl} (gain: +${round(gainPct, 2)}%)`, null, "engine");
+    }
+    // Lock 50% profit once up +2.2%
+    else if (gainPct >= 2.2) {
+      const halfGainSl = round(entry + (price - entry) * 0.5, 4);
+      if (halfGainSl > sl) {
+        sl = halfGainSl;
+        await pool.query("UPDATE open_positions SET stop_loss = $1 WHERE id = $2", [sl, p.id]);
+        await logEngine("INFO", `[ProfitLock] ${p.symbol} LONG profit-locked @ ${sl} (gain: +${round(gainPct, 2)}%)`, null, "engine");
+      }
+    }
+  } else {
+    // Breakeven: once down +1.2% in profit, lower SL below entry
+    if (gainPct >= 1.2 && sl > entry - beBuffer) {
+      sl = round(entry - beBuffer, 4);
+      await pool.query("UPDATE open_positions SET stop_loss = $1 WHERE id = $2", [sl, p.id]);
+      await logEngine("INFO", `[ProfitLock] ${p.symbol} SHORT breakeven set @ ${sl} (gain: +${round(gainPct, 2)}%)`, null, "engine");
+    }
+    // Lock 50% profit once up +2.2%
+    else if (gainPct >= 2.2) {
+      const halfGainSl = round(entry - (entry - price) * 0.5, 4);
+      if (halfGainSl < sl) {
+        sl = halfGainSl;
+        await pool.query("UPDATE open_positions SET stop_loss = $1 WHERE id = $2", [sl, p.id]);
+        await logEngine("INFO", `[ProfitLock] ${p.symbol} SHORT profit-locked @ ${sl} (gain: +${round(gainPct, 2)}%)`, null, "engine");
+      }
+    }
+  }
 
   if (p.side === "long") {
     if (price <= sl) closeReason = "stop_loss";
@@ -896,7 +1005,7 @@ async function monitorPosition(p: Row, s: any): Promise<void> {
   );
 
   if (closeReason) {
-    await closePosition(p.id, closeReason, price, p, s);
+    await closePosition(p.id, closeReason, price, { ...p, stop_loss: sl }, s);
   }
 }
 
@@ -984,12 +1093,25 @@ async function recordLearning(pos: Row, closed: Row, s: any): Promise<void> {
   const win = num(closed.profit) >= 0;
   const pnl = num(closed.profit);
   const strategies = pos.strategy_keys ?? [];
+  const entry = num(pos.entry);
+  const closePrice = num(closed.close_price);
+  const reason = closed.close_reason ?? (win ? "take_profit" : "stop_loss");
+
+  // Perform root-cause diagnosis
+  const diag = diagnoseTradeOutcome(
+    pos.side,
+    entry,
+    closePrice,
+    pnl,
+    reason
+  );
+
   await pool.query(
     `INSERT INTO learning_history (symbol, timeframe, strategies, scores, decision, result, pnl, created_at)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
     [
       pos.symbol, pos.type === "spot" ? "spot" : "futures", strategies,
-      JSON.stringify({ score: num(pos.score), confidence: num(pos.confidence) }),
+      JSON.stringify({ score: num(pos.score), confidence: num(pos.confidence), diagnosis: diag.code, summary: diag.summaryEn, recommendation: diag.recommendation }),
       pos.side, win ? "win" : "loss", round(pnl, 8), now(),
     ]
   );
@@ -1015,8 +1137,8 @@ async function recordLearning(pos: Row, closed: Row, s: any): Promise<void> {
       "review",
       "You are a trading review assistant. Analyze this closed trade, list 2-3 concrete lessons in the user's language.",
       JSON.stringify({
-        symbol: pos.symbol, side: pos.side, entry: num(pos.entry), exit: num(closed.close_price),
-        pnl, reason: closed.close_reason, strategies, score: num(pos.score),
+        symbol: pos.symbol, side: pos.side, entry, exit: closePrice,
+        pnl, reason, strategies, score: num(pos.score), diagnosis: diag.rootCause,
       }),
       { cacheKey: `review:${pos.id}` }
     ).then((r) => {

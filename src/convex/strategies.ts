@@ -194,6 +194,7 @@ export const listStrategyPresets = query({
     const byKey = new Map(rows.map((r) => [r.key, r]));
     // The preset id last applied ("all"/"none" are transient states).
     const currentPreset = String((await getSetting(ctx, "engine.strategyPreset")) ?? "") || "";
+    const activePresetIds = (currentPreset ? currentPreset.split(",") : []).map((s) => s.trim()).filter(Boolean);
     const presets = STRATEGY_PRESETS.map((p) => {
       const matched = p.keys.filter((k) => byKey.has(k));
       const active = matched.filter((k) => enabledKeys.has(k)).length;
@@ -209,9 +210,59 @@ export const listStrategyPresets = query({
         strategyCount: matched.length,
         activeCount: active,
         isActive: active === matched.length && active > 0,
+        isInActivePresets: activePresetIds.includes(p.id),
       };
     });
-    return { presets, current: currentPreset, total: rows.length };
+    return { presets, current: currentPreset, activePresetIds, total: rows.length };
+  },
+});
+
+/**
+ * Applies multiple strategy presets simultaneously.
+ * Unions the strategy keys from all selected presets without conflict.
+ */
+export const applyMultipleStrategyPresets = mutation({
+  args: { token: v.string(), presetIds: v.array(v.string()) },
+  handler: async (ctx, { token, presetIds }) => {
+    await requireAdmin(ctx, token);
+    let rows = await ctx.db.query("strategies").collect();
+    if (rows.length === 0) {
+      await ensureStrategies(ctx);
+      rows = await ctx.db.query("strategies").collect();
+    }
+    const unionKeys = new Set<string>();
+    const mergedRisk: Record<string, any> = {};
+    const validPresetIds: string[] = [];
+
+    for (const pid of presetIds) {
+      const id = String(pid ?? "").trim().toLowerCase();
+      if (!id) continue;
+      const preset = getStrategyPreset(id);
+      if (preset) {
+        validPresetIds.push(id);
+        for (const k of preset.keys) unionKeys.add(k);
+        Object.assign(mergedRisk, preset.risk);
+      }
+    }
+
+    let changed = 0;
+    for (const row of rows) {
+      const on = unionKeys.has(row.key);
+      const cur = Boolean(row.enabled) && Boolean(row.engineEnabled);
+      if (cur !== on) {
+        await ctx.db.patch(row._id, { enabled: on, engineEnabled: on });
+        changed++;
+      }
+    }
+
+    for (const [k, val] of Object.entries(mergedRisk)) {
+      await setSetting(ctx, k, val, "admin:multi-strategy-preset");
+    }
+
+    const presetJoined = validPresetIds.join(",");
+    await setSetting(ctx, "engine.strategyPreset", presetJoined, "admin:multi-strategy-preset");
+
+    return { ok: true, activePresets: validPresetIds, enabledCount: unionKeys.size, changed };
   },
 });
 

@@ -7,6 +7,12 @@ import { SparkChart } from "@/components/SparkChart";
 import { LiveChart } from "@/components/LiveChart";
 import { LiveWinningTicker } from "@/components/LiveWinningTicker";
 import { MultiAgentArena } from "@/components/MultiAgentArena";
+import { CryptoIcon } from "@/components/CryptoIcon";
+import { FrozenCapitalBanner } from "@/components/FrozenCapitalBanner";
+import { FundamentalNewsSection } from "@/components/FundamentalNewsSection";
+import { SupportTicketModal } from "@/components/SupportTicketModal";
+import { VipTrialCard } from "@/components/VipTrialCard";
+import { TradingGlossaryTooltip } from "@/components/TradingGlossaryTooltip";
 import {
   Badge,
   Button,
@@ -52,6 +58,7 @@ import {
   AlertTriangle,
   ArrowDownRight,
   ArrowDownToLine,
+  ArrowLeftRight,
   ArrowRightToLine,
   ArrowUpRight,
   CheckCircle2,
@@ -110,6 +117,7 @@ import {
   Coins,
   Flame,
   FolderKanban,
+  Headphones,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
@@ -1172,6 +1180,7 @@ function PositionCard({ p, lang, onClose, onSendTg }: { p: any; lang: Lang; onCl
     <Card className="border-border/70 bg-card/60">
       <CardHeader className="flex-row items-start justify-between space-y-0 pb-2">
         <div className="flex flex-wrap items-center gap-2">
+          <CryptoIcon symbol={p.symbol} size="sm" />
           <span className="terminal-font text-lg font-bold tracking-tight">{fmtSym(p.symbol)}</span>
           <Badge variant="outline" className={`text-[10px] ${p.market === "crypto" ? "border-cyan-400/30 text-cyan-300" : "border-gold/30 text-gold"}`}>{p.market === "crypto" ? "Crypto" : "Forex"}</Badge>
           <Side side={p.side} />
@@ -1753,6 +1762,10 @@ function UserPanel({ token }: { token: string }) {
   const myChats = useQuery(api.aiChat.myAiChats, { token });
   const education = useQuery(api.learning.publicEducation, { token });
   const setAiPref = useMutation(api.me.setAiPreference);
+  const fundamentalNews = useQuery(api.admin.listFundamentalNews, {});
+  const claimVipTrialM = useMutation(api.admin.claimVipTrial);
+  const applyDiscountCodeM = useMutation(api.admin.applyDiscountCode);
+  const [supportModalOpen, setSupportModalOpen] = useState(false);
 
   const submitDeposit = useMutation(api.admin.submitDeposit);
   const requestWithdrawal = useMutation(api.admin.requestWithdrawal);
@@ -1766,7 +1779,12 @@ function UserPanel({ token }: { token: string }) {
   const edgeTtsHealth = useAction(api.nodeCalls.edgeTtsHealth);
   const submitTomanDeposit = useMutation(api.coins.submitTomanDeposit);
   const buyWolfCoins = useMutation(api.coins.buyWolfCoins);
+  const buyWolfCoinsWithUsdt = useMutation(api.coins.buyWolfCoinsWithUsdt);
   const buyCoinPackage = useMutation(api.coins.buyCoinPackage);
+  const buyCoinPackageWithUsdt = useMutation(api.coins.buyCoinPackageWithUsdt);
+  const swapUsdtToToman = useMutation(api.coins.swapUsdtToToman);
+  const swapTomanToUsdt = useMutation(api.coins.swapTomanToUsdt);
+  const finHistory = useQuery(api.coins.financialHistory, { token, limit: 100 });
   const redeemVoucher = useMutation(api.coins.redeemVoucher);
   const claimProfileReward = useMutation(api.coins.claimProfileReward);
   const burnCoins = useMutation(api.coins.burnCoins);
@@ -1795,6 +1813,9 @@ function UserPanel({ token }: { token: string }) {
   const [wdAmount, setWdAmount] = useState("");
   const [wdAddress, setWdAddress] = useState("");
   const [wdNetwork, setWdNetwork] = useState("TRC20");
+  const [swapMode, setSwapMode] = useState<"usdt_to_toman" | "toman_to_usdt">("usdt_to_toman");
+  const [swapAmount, setSwapAmount] = useState("");
+  const [buyCoinsCurrency, setBuyCoinsCurrency] = useState<"toman" | "usdt">("toman");
   const [vipCapital, setVipCapital] = useState<Record<string, string>>({});
   const [ticketForm, setTicketForm] = useState({ subject: "", message: "" });
   const [refCode, setRefCode] = useState("");
@@ -1812,6 +1833,7 @@ function UserPanel({ token }: { token: string }) {
   const [activePrediction, setActivePrediction] = useState<any>(null);
   const [activeQuiz, setActiveQuiz] = useState<any>(null);
   const [quizAnswer, setQuizAnswer] = useState<number | null>(null);
+  const [quizCategory, setQuizCategory] = useState<string>("all");
   const [predictionSymbol, setPredictionSymbol] = useState("BTCUSDT");
   const [editingProfile, setEditingProfile] = useState(false);
   const [profileForm, setProfileForm] = useState<Record<string, string>>({});
@@ -2121,12 +2143,34 @@ function UserPanel({ token }: { token: string }) {
     }
   };
 
+  const doSwap = async () => {
+    const amt = parseFloat(swapAmount);
+    if (!(amt > 0)) return toast.error(s.amount);
+    try {
+      if (swapMode === "usdt_to_toman") {
+        const res: any = await swapUsdtToToman({ token, usdtAmount: amt });
+        toast.success(lang === "fa" ? `سواپ موفق: ${res.usdt} تتر ➔ ${(res.tomanReceived ?? 0).toLocaleString()} تومان` : `Swap successful: ${res.usdt} USDT ➔ ${(res.tomanReceived ?? 0).toLocaleString()} Toman`);
+      } else {
+        const res: any = await swapTomanToUsdt({ token, tomanAmount: amt });
+        toast.success(lang === "fa" ? `سواپ موفق: ${(res.toman ?? 0).toLocaleString()} تومان ➔ ${res.usdtReceived} تتر` : `Swap successful: ${(res.toman ?? 0).toLocaleString()} Toman ➔ ${res.usdtReceived} USDT`);
+      }
+      setSwapAmount("");
+    } catch (e: any) {
+      toast.error(String(e?.message ?? "error"));
+    }
+  };
+
   const doBuyCoins = async () => {
     const coins2 = Math.floor(parseFloat(buyCoinsQty));
     if (!(coins2 > 0)) return toast.error(s.amount);
     try {
-      await buyWolfCoins({ token, coins: coins2 });
-      toast.success(s.saved);
+      if (buyCoinsCurrency === "usdt") {
+        const res: any = await buyWolfCoinsWithUsdt({ token, coins: coins2 });
+        toast.success(lang === "fa" ? `خرید با تتر موفق: +${res.coins} سکه (${res.usdtSpent} USDT)` : `Purchased +${res.coins} coins with ${res.usdtSpent} USDT`);
+      } else {
+        await buyWolfCoins({ token, coins: coins2 });
+        toast.success(s.saved);
+      }
       setBuyCoinsQty("");
     } catch (e: any) {
       toast.error(String(e?.message ?? "error"));
@@ -2167,9 +2211,10 @@ function UserPanel({ token }: { token: string }) {
     }
   };
 
-  const doStartQuiz = async () => {
+  const doStartQuiz = async (cat?: string) => {
     try {
-      const res: any = await startQuizM({ token });
+      const chosenCat = cat ?? (quizCategory === "all" ? undefined : quizCategory);
+      const res: any = await startQuizM({ token, category: chosenCat });
       setActiveQuiz(res);
       setQuizAnswer(null);
     } catch (e: any) {
@@ -2346,6 +2391,24 @@ function UserPanel({ token }: { token: string }) {
       {/* Live Winning Ticker (Casino / High-Stakes Profits Stream) */}
       <LiveWinningTicker lang={lang} />
 
+      {/* Floating Frozen Capital Banner */}
+      <FrozenCapitalBanner
+        frozen={frozen}
+        floatingPnl={userFloating}
+        realizedPnl={userRealized}
+        shareRatio={account?.share?.ratio ? Math.round(account.share.ratio * 100) : 0}
+        onUnfreeze={async (amt) => {
+          await requestUnfreeze({ token, amount: amt });
+          toast.success(s.pending);
+        }}
+        onCommit={async (amt) => {
+          await commitToEngineM({ token, amount: amt });
+          toast.success(lang === "fa" ? "به موتور معاملاتی منتقل شد ✓" : "Committed to engine ✓");
+        }}
+        availableBalance={wallet?.balance ?? 0}
+        lang={lang}
+      />
+
       {/* Desktop Tab Selector */}
       <div className="hidden sm:flex items-center gap-2 rounded-xl border border-border/60 bg-card/40 p-1.5">
         <Button size="sm" variant={tab === "home" ? "default" : "ghost"} className="gap-1.5" onClick={() => setTab("home")}>
@@ -2385,66 +2448,130 @@ function UserPanel({ token }: { token: string }) {
         </div>
       ) : tab === "fun" ? (
         <div className="space-y-6">
-          <Card className="border-emerald-400/20 bg-card/60">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-1.5 text-sm"><Activity className="size-4 text-emerald-300" /> {s.positionsOpen}</CardTitle>
-              <CardDescription>{s.positionsEmpty}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {(positions ?? []).length === 0 && <p className="py-4 text-center text-[11px] text-muted-foreground">{lang === "fa" ? "پوزیشن بازی وجود ندارد — گرگ‌ها در حال اسکن بازار هستند." : "No open positions — the pack is scanning the market."}</p>}
-              {(positions ?? []).slice(0, 10).map((p: any) => (
-                <div key={p.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/50 bg-background/40 px-3 py-2 text-xs">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className={`terminal-font font-bold ${p.side === "long" ? "text-emerald-300" : "text-red-300"}`} dir="ltr">{p.side === "long" ? "▲" : "▼"} {fmtSym(p.symbol)}</span>
-                    <span className={`rounded px-1.5 py-px text-[10px] font-bold ${p.side === "long" ? "bg-emerald-400/15 text-emerald-300" : "bg-red-400/15 text-red-300"}`}>{p.side === "long" ? (lang === "fa" ? "لانگ" : "LONG") : (lang === "fa" ? "شورت" : "SHORT")}</span>
-                    <span className="terminal-font tabular-nums text-muted-foreground" dir="ltr">{p.leverage}x</span>
+          <Card className="border-emerald-500/30 bg-card/70 shadow-lg backdrop-blur-sm overflow-hidden">
+            <CardHeader className="pb-3 border-b border-border/40">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex size-9 items-center justify-center rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                    <TrendingUp className="size-4" />
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="terminal-font tabular-nums" dir="ltr">E {num(p.entry, 5)}</span>
-                    <span className="terminal-font tabular-nums" dir="ltr">SL {num(p.stopLoss, 5)}</span>
-                    <span className="terminal-font tabular-nums" dir="ltr">TP {num(p.takeProfit, 5)}</span>
-                    <span className={`terminal-font tabular-nums text-[10px] font-bold ${p.pnl >= 0 ? "text-emerald-300" : "text-red-300"}`} dir="ltr">{p.pnl >= 0 ? "+" : ""}{num(p.pnl, 2)} ({p.pnlPct >= 0 ? "+" : ""}{(p.pnlPct * 100).toFixed(1)}%)</span>
+                  <div>
+                    <CardTitle className="text-base font-bold flex items-center gap-2">
+                      {s.prediction}
+                      <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-[10px] text-emerald-400">
+                        {lang === "fa" ? "کندل زنده لحظه‌ای" : "Live Candles"}
+                      </Badge>
+                    </CardTitle>
+                    <CardDescription className="text-xs">{s.guessHint}</CardDescription>
                   </div>
                 </div>
-              ))}
-            </CardContent>
-          </Card>
-          <Card className="border-cyan-400/20 bg-card/60">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-1.5 text-sm"><Brain className="size-4 text-cyan-300" /> {s.prediction}</CardTitle>
-              <CardDescription>{s.guessHint}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <Select value={predictionSymbol} onValueChange={setPredictionSymbol}>
-                  <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "DOGEUSDT"].map((sym) => <SelectItem key={sym} value={sym}>{sym}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <Button size="sm" variant="outline" className="border-cyan-400/30 text-cyan-300" onClick={doStartPrediction}>
-                  {s.activeSession}
-                </Button>
-                <span className="text-[11px] text-muted-foreground">{s.predictionReward}: +{coins?.settings?.rewardPrediction ?? 3}</span>
-                {streak > 0 && <span className="rounded bg-gold/15 px-1.5 py-0.5 text-[10px] font-bold text-gold">🔥 {s.streak}: {streak}</span>}
+                {streak > 0 && (
+                  <Badge className="border-gold/40 bg-gold/15 text-gold text-xs font-bold px-3 py-1">
+                    🔥 {s.streak}: {streak} (+{Math.min(streak, 10)} {lang === "fa" ? "سکه بونوس" : "Bonus"})
+                  </Badge>
+                )}
               </div>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground font-semibold">{lang === "fa" ? "انتخاب جفت‌ارز:" : "Pair:"}</span>
+                  <Select
+                    value={predictionSymbol}
+                    onValueChange={(sym) => {
+                      setPredictionSymbol(sym);
+                      void (async () => {
+                        try {
+                          const res: any = await startPrediction({ token, symbol: sym });
+                          setActivePrediction(res);
+                        } catch (e: any) {
+                          toast.error(String(e?.message ?? "error"));
+                        }
+                      })();
+                    }}
+                  >
+                    <SelectTrigger className="w-44 h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "DOGEUSDT"].map((sym) => (
+                        <SelectItem key={sym} value={sym}>
+                          <div className="flex items-center gap-2">
+                            <CryptoIcon symbol={sym} size="xs" />
+                            <span>{sym}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="rounded-md bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 text-emerald-400 font-medium">
+                    💰 {s.predictionReward}: +{coins?.settings?.rewardPrediction ?? 5} {lang === "fa" ? "ولف‌کوین" : "Coins"}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 text-xs gap-1"
+                    onClick={doStartPrediction}
+                  >
+                    <RefreshCw className="size-3" />
+                    {lang === "fa" ? "کندل جدید" : "New Candle"}
+                  </Button>
+                </div>
+              </div>
+
               {activePrediction ? (
-                <div className="rounded-md border border-cyan-400/25 bg-background/40 p-3">
-                  <div className="mb-2 flex items-center justify-between">
-                    <span className="terminal-font text-sm font-bold" dir="ltr">{fmtSym(activePrediction.symbol)}</span>
-                    <span className="text-[11px] text-muted-foreground">{s.predictionReward}: +{activePrediction.reward}</span>
+                <div className="rounded-xl border border-border/60 bg-background/50 p-4 space-y-4 shadow-inner">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CryptoIcon symbol={activePrediction.symbol} size="sm" />
+                      <span className="terminal-font text-base font-bold text-foreground" dir="ltr">
+                        {fmtSym(activePrediction.symbol)}
+                      </span>
+                      <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                        {lang === "fa" ? "تایم‌فریم ۱ دقیقه" : "1m Timeframe"}
+                      </span>
+                    </div>
+                    <span className="text-xs font-semibold text-emerald-400">
+                      +{activePrediction.reward} {lang === "fa" ? "سکه جایزه" : "Reward"}
+                    </span>
                   </div>
-                  <MiniCandles data={activePrediction.candles} />
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    <Button className="w-full" onClick={() => doResolvePrediction("long")}>
-                      <ArrowUpRight className="me-1.5 size-4" /> {s.predictLong}
+
+                  <div className="p-2 rounded-lg bg-card/60 border border-border/40">
+                    <MiniCandles data={activePrediction.candles} />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <Button
+                      size="lg"
+                      className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold h-12 text-sm shadow-md transition-all hover:scale-[1.01]"
+                      onClick={() => doResolvePrediction("long")}
+                    >
+                      <ArrowUpRight className="me-2 size-5" />
+                      {lang === "fa" ? "حدس صعودی (LONG ▲)" : "Predict Bullish (LONG ▲)"}
                     </Button>
-                    <Button variant="destructive" className="w-full" onClick={() => doResolvePrediction("short")}>
-                      <ArrowDownRight className="me-1.5 size-4" /> {s.predictShort}
+                    <Button
+                      size="lg"
+                      variant="destructive"
+                      className="w-full bg-rose-600 hover:bg-rose-500 text-white font-bold h-12 text-sm shadow-md transition-all hover:scale-[1.01]"
+                      onClick={() => doResolvePrediction("short")}
+                    >
+                      <ArrowDownRight className="me-2 size-5" />
+                      {lang === "fa" ? "حدس نزولی (SHORT ▼)" : "Predict Bearish (SHORT ▼)"}
                     </Button>
                   </div>
                 </div>
-              ) : null}
+              ) : (
+                <div className="flex flex-col items-center justify-center p-8 rounded-xl border border-dashed border-border/60 bg-background/30 gap-3">
+                  <p className="text-sm text-muted-foreground">{lang === "fa" ? "در حال دریافت دیتای کندل‌های بازار..." : "Fetching live candle data..."}</p>
+                  <Button size="sm" onClick={doStartPrediction} className="gap-1.5">
+                    <Play className="size-3.5" />
+                    {lang === "fa" ? "شروع حدس کندل" : "Start Guessing"}
+                  </Button>
+                </div>
+              )}
               {(predictions ?? []).length > 0 && (
                 <div>
                   <p className="mb-1.5 text-[11px] font-bold text-muted-foreground">{s.predictionHistory}</p>
@@ -2464,25 +2591,96 @@ function UserPanel({ token }: { token: string }) {
             </CardContent>
           </Card>
 
-                    <Card className="border-purple-400/20 bg-card/60">
+          <Card className="border-purple-400/20 bg-card/60">
             <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-1.5 text-sm"><Brain className="size-4 text-purple-300" /> {s.quiz}</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-1.5 text-sm"><Brain className="size-4 text-purple-300" /> {s.quiz}</CardTitle>
+                {streak > 0 && (
+                  <Badge className="border-gold/40 bg-gold/15 text-gold text-[10px] font-bold">
+                    🔥 {s.streak}: {streak} (+{Math.min(streak, 5)} {lang === "fa" ? "سکه بونوس" : "Bonus"})
+                  </Badge>
+                )}
+              </div>
               <CardDescription>{s.quizHint}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
+              {/* Category Filter Pills */}
+              <div className="flex flex-wrap items-center gap-1.5 border-b border-border/40 pb-2.5">
+                <span className="text-[11px] text-muted-foreground font-semibold me-1">{lang === "fa" ? "دسته‌بندی:" : "Category:"}</span>
+                {[
+                  { key: "all", labelFa: "همه", labelEn: "All" },
+                  { key: "price_action", labelFa: "پرایس اکشن", labelEn: "Price Action" },
+                  { key: "smc", labelFa: "اسمارت مانی (SMC)", labelEn: "SMC" },
+                  { key: "risk_management", labelFa: "مدیریت ریسک", labelEn: "Risk Mgmt" },
+                  { key: "indicators", labelFa: "اندیکاتورها", labelEn: "Indicators" },
+                  { key: "crypto", labelFa: "ارز دیجیتال", labelEn: "Crypto" },
+                  { key: "forex", labelFa: "فارکس", labelEn: "Forex" },
+                ].map((c) => (
+                  <button
+                    key={c.key}
+                    type="button"
+                    onClick={() => { setQuizCategory(c.key); if (activeQuiz) doStartQuiz(c.key); }}
+                    className={`rounded-md px-2 py-1 text-[10px] font-bold transition-all ${
+                      quizCategory === c.key
+                        ? "bg-purple-500/25 border border-purple-400/50 text-purple-200 shadow-sm"
+                        : "bg-background/40 border border-border/50 text-muted-foreground hover:border-purple-400/30"
+                    }`}
+                  >
+                    {lang === "fa" ? c.labelFa : c.labelEn}
+                  </button>
+                ))}
+              </div>
+
               {!activeQuiz ? (
-                <Button size="sm" variant="outline" className="border-purple-400/30 text-purple-300" onClick={doStartQuiz}>{s.quizStart}</Button>
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                  <p className="text-xs text-muted-foreground">
+                    {lang === "fa"
+                      ? "آماده‌اید مهارت معامله‌گری خود را بسنجید و ولف‌کوین پاداش بگیرید؟"
+                      : "Ready to test your trading skills and earn wolf coins?"}
+                  </p>
+                  <Button size="sm" className="bg-purple-600 hover:bg-purple-500 text-white font-bold" onClick={() => doStartQuiz()}>
+                    <Zap className="size-3.5 me-1 text-amber-300" />
+                    {s.quizStart}
+                  </Button>
+                </div>
               ) : (
-                <div className="rounded-md border border-purple-400/25 bg-background/40 p-3">
-                  <p className="mb-3 text-sm font-bold">{lang === "fa" ? activeQuiz.question : activeQuiz.questionEn}</p>
-                  <div className="space-y-2">
+                <div className="rounded-lg border border-purple-400/30 bg-background/50 p-4 space-y-3 shadow-inner">
+                  <div className="flex items-center justify-between border-b border-border/40 pb-2">
+                    <Badge variant="outline" className="text-[10px] text-purple-300 border-purple-400/40">
+                      {activeQuiz.category ? activeQuiz.category.toUpperCase().replace("_", " ") : "TRADING"}
+                    </Badge>
+                    <span className="terminal-font text-xs font-bold text-emerald-300">
+                      +{activeQuiz.reward} 🪙 {streak > 0 ? `(+${Math.min(streak, 5)} 🔥)` : ""}
+                    </span>
+                  </div>
+                  <p className="text-sm font-bold leading-relaxed">{lang === "fa" ? activeQuiz.question : activeQuiz.questionEn}</p>
+                  <div className="space-y-2 pt-1">
                     {activeQuiz.options.map((opt: string, i: number) => (
-                      <button key={i} className={`w-full rounded-md border p-2.5 text-xs text-start transition-colors ${quizAnswer === i ? "border-purple-400 bg-purple-400/15 text-purple-300" : "border-border/50 bg-background/30 hover:border-purple-400/30"}`} onClick={() => setQuizAnswer(i)}>
+                      <button
+                        key={i}
+                        className={`w-full rounded-md border p-3 text-xs text-start transition-all font-medium ${
+                          quizAnswer === i
+                            ? "border-purple-400 bg-purple-500/20 text-purple-200 shadow-[0_0_12px_rgba(168,85,247,0.2)]"
+                            : "border-border/60 bg-background/40 hover:border-purple-400/40 text-foreground"
+                        }`}
+                        onClick={() => setQuizAnswer(i)}
+                      >
+                        <span className="me-2 inline-flex size-5 items-center justify-center rounded-full bg-purple-400/15 text-[10px] font-bold text-purple-300">
+                          {i + 1}
+                        </span>
                         {opt}
                       </button>
                     ))}
                   </div>
-                  <Button className="mt-3 w-full" disabled={quizAnswer === null} onClick={doResolveQuiz}>{s.quizSubmit} · +{activeQuiz.reward} 🪙</Button>
+                  <div className="flex items-center gap-2 pt-2">
+                    <Button className="flex-1 bg-purple-600 hover:bg-purple-500 text-white font-bold" disabled={quizAnswer === null} onClick={doResolveQuiz}>
+                      <CheckCircle2 className="size-4 me-1.5" />
+                      {s.quizSubmit} · +{activeQuiz.reward} 🪙
+                    </Button>
+                    <Button size="sm" variant="ghost" className="text-muted-foreground text-xs" onClick={() => setActiveQuiz(null)}>
+                      {lang === "fa" ? "انصراف" : "Cancel"}
+                    </Button>
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -2697,6 +2895,20 @@ function UserPanel({ token }: { token: string }) {
               <p className="mt-2 text-[10px] text-muted-foreground">{s.profileRewardHint}</p>
             </CardContent>
           </Card>
+
+          {/* ── VIP Trial & Discount Code Section ── */}
+          <VipTrialCard
+            isVip={hasActiveVip}
+            vipExpiresAt={account?.profile?.vipExpiresAt}
+            onClaimTrial={async () => {
+              await claimVipTrialM({ token });
+            }}
+            onApplyDiscount={async (code: string) => {
+              const res = await applyDiscountCodeM({ token, code });
+              return res;
+            }}
+            lang={lang}
+          />
 
           {/* ── VIP (hidden for active members — view only via profile) ── */}
           {!hasActiveVip || showVipPanel ? (
@@ -3086,21 +3298,70 @@ function UserPanel({ token }: { token: string }) {
             </div>
           </section>
 
-              <Card className="border-border/70 bg-card/60">
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-1.5 text-sm"><ArrowRightToLine className="size-4 text-purple-400" /> {lang === "fa" ? "انتقال به موتور" : "Transfer to Engine"}</CardTitle>
-                  <CardDescription>{lang === "fa" ? "موجودی قابل برداشت خود را به موتور منتقل کنید تا با آن معامله شود. سود به همین مبلغ اضافه می‌شود." : "Transfer available balance to the engine for trading. Profits are added to your committed capital."}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <p className="text-xs">{s.availableBalance}: <span className="terminal-font font-bold tabular-nums text-emerald-300" dir="ltr">{money(wallet?.balance)}</span></p>
-                  <Label className="text-xs text-muted-foreground">{s.amount}</Label>
-                  <div className="flex gap-1.5">
-                    <Input type="number" min="0" value={commitAmount} onChange={(e) => setCommitAmount(e.target.value)} />
-                    <Button onClick={doCommitToEngine}>{s.submit}</Button>
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="grid gap-4 lg:grid-cols-2">
+                <Card className="border-border/70 bg-card/60">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="flex items-center gap-1.5 text-sm"><ArrowRightToLine className="size-4 text-purple-400" /> {lang === "fa" ? "انتقال به موتور" : "Transfer to Engine"}</CardTitle>
+                    <CardDescription>{lang === "fa" ? "موجودی قابل برداشت خود را به موتور منتقل کنید تا با آن معامله شود. سود به همین مبلغ اضافه می‌شود." : "Transfer available balance to the engine for trading. Profits are added to your committed capital."}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <p className="text-xs">{s.availableBalance}: <span className="terminal-font font-bold tabular-nums text-emerald-300" dir="ltr">{money(wallet?.balance)}</span> <span className="text-[10px] text-muted-foreground">({((wallet?.balance ?? 0) * tomanRate).toLocaleString()} {lang === "fa" ? "تومان" : "Toman"})</span></p>
+                    <Label className="text-xs text-muted-foreground">{s.amount}</Label>
+                    <div className="flex gap-1.5">
+                      <Input type="number" min="0" value={commitAmount} onChange={(e) => setCommitAmount(e.target.value)} />
+                      <Button onClick={doCommitToEngine}>{s.submit}</Button>
+                    </div>
+                  </CardContent>
+                </Card>
 
+                {/* ── Instant Swap (USDT <-> Toman) ────────────────────────── */}
+                <Card className="border-cyan-400/30 bg-card/60">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="flex items-center justify-between text-sm">
+                      <span className="flex items-center gap-1.5"><ArrowLeftRight className="size-4 text-cyan-400" /> {lang === "fa" ? "سواپ فوری (تتر ⇄ تومان)" : "Instant Swap (USDT ⇄ Toman)"}</span>
+                      <Badge variant="outline" className="border-gold/40 text-[10px] text-gold" dir="ltr">1 USDT = {tomanRate.toLocaleString()} IRT</Badge>
+                    </CardTitle>
+                    <CardDescription>{lang === "fa" ? "تبدیل آنی و بدون کارمزد بین موجودی تتر و تومان حساب کاربری" : "Instant zero-fee conversion between USDT and Toman wallet"}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <div className="flex items-center justify-between gap-1 rounded-md border border-border/50 bg-background/50 p-1">
+                      <Button size="sm" variant={swapMode === "usdt_to_toman" ? "default" : "ghost"} className="h-7 flex-1 text-xs" onClick={() => setSwapMode("usdt_to_toman")}>
+                        USDT ➔ {lang === "fa" ? "تومان" : "Toman"}
+                      </Button>
+                      <Button size="sm" variant={swapMode === "toman_to_usdt" ? "default" : "ghost"} className="h-7 flex-1 text-xs" onClick={() => setSwapMode("toman_to_usdt")}>
+                        {lang === "fa" ? "تومان" : "Toman"} ➔ USDT
+                      </Button>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                      <span>{lang === "fa" ? "موجودی قابل تبدیل:" : "Available:"}</span>
+                      <span className="terminal-font font-bold text-foreground" dir="ltr">
+                        {swapMode === "usdt_to_toman" ? `${(wallet?.balance ?? 0).toFixed(2)} USDT` : `${(coins?.toman ?? 0).toLocaleString()} IRT`}
+                      </span>
+                    </div>
+                    <div className="flex gap-1.5">
+                      <Input
+                        type="number"
+                        min="0"
+                        placeholder={swapMode === "usdt_to_toman" ? "USDT" : lang === "fa" ? "مبلغ تومان" : "Toman"}
+                        className="flex-1"
+                        value={swapAmount}
+                        onChange={(e) => setSwapAmount(e.target.value)}
+                      />
+                      <Button variant="outline" size="sm" className="h-9 px-2 text-xs" onClick={() => setSwapAmount(String(swapMode === "usdt_to_toman" ? wallet?.balance ?? 0 : coins?.toman ?? 0))}>MAX</Button>
+                      <Button className="h-9 gap-1" onClick={doSwap}>
+                        <ArrowLeftRight className="size-3.5" /> {lang === "fa" ? "تبدیل" : "Swap"}
+                      </Button>
+                    </div>
+                    {parseFloat(swapAmount) > 0 && (
+                      <p className="rounded-md border border-cyan-400/20 bg-cyan-400/5 p-1.5 text-center text-[11px] text-cyan-300">
+                        {swapMode === "usdt_to_toman"
+                          ? `≈ ${(parseFloat(swapAmount) * tomanRate).toLocaleString(lang === "fa" ? "fa-IR" : "en-US")} ${lang === "fa" ? "تومان دریافت می‌کنید" : "Toman you receive"}`
+                          : `≈ ${(parseFloat(swapAmount) / tomanRate).toFixed(2)} ${lang === "fa" ? "تتر دریافت می‌کنید" : "USDT you receive"}`}
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
 
           {/* coins economy (toman deposit / buy / packages / ledger) */}
           <section className="space-y-4">
@@ -3136,30 +3397,54 @@ function UserPanel({ token }: { token: string }) {
 
               <Card className="border-border/70 bg-card/60">
                 <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-1.5 text-sm"><Zap className="size-4 text-cyan-300" /> {s.buyCoins}</CardTitle>
-                  <CardDescription>{s.monthlyBurn}: ~{monthlyBurn.toLocaleString("en-US")} {s.coinsBalance} · {s.tomanPerCoin}: {tomanPerCoin.toLocaleString("en-US")}</CardDescription>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-1.5 text-sm"><Zap className="size-4 text-cyan-300" /> {s.buyCoins}</CardTitle>
+                    <div className="flex gap-1 rounded border border-border/50 p-0.5">
+                      <Button size="sm" variant={buyCoinsCurrency === "toman" ? "default" : "ghost"} className="h-6 px-2 text-[10px]" onClick={() => setBuyCoinsCurrency("toman")}>
+                        {lang === "fa" ? "تومان" : "Toman"}
+                      </Button>
+                      <Button size="sm" variant={buyCoinsCurrency === "usdt" ? "default" : "ghost"} className="h-6 px-2 text-[10px]" onClick={() => setBuyCoinsCurrency("usdt")}>
+                        USDT (تتر)
+                      </Button>
+                    </div>
+                  </div>
+                  <CardDescription>{s.monthlyBurn}: ~{monthlyBurn.toLocaleString("en-US")} {s.coinsBalance} · 1 {lang === "fa" ? "سکه" : "coin"} = {tomanPerCoin.toLocaleString("en-US")} {lang === "fa" ? "تومان" : "Toman"} {tomanRate > 0 ? `(≈ $${(tomanPerCoin / tomanRate).toFixed(4)})` : ""}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-2">
                   <div className="flex gap-2">
                     <Input type="number" min="1" placeholder={s.coinsBalance} className="flex-1" value={buyCoinsQty} onChange={(e) => setBuyCoinsQty(e.target.value)} />
-                    <Button onClick={doBuyCoins}>{s.buyCoins}</Button>
+                    <Button onClick={doBuyCoins}>{buyCoinsCurrency === "usdt" ? (lang === "fa" ? "خرید با تتر" : "Buy with USDT") : s.buyCoins}</Button>
                   </div>
-                  <p className="text-[11px] text-muted-foreground">
-                    {s.cost}: {(Math.floor(parseFloat(buyCoinsQty) || 0) * tomanPerCoin).toLocaleString(lang === "fa" ? "fa-IR" : "en-US")} {lang === "fa" ? "تومان" : "toman"}
-                  </p>
-                  <div className="space-y-1.5">
-                    {(coins?.settings?.packages ?? []).map((pk: any, i: number) => (
-                      <div key={i} className="flex items-center justify-between gap-2 rounded-md border border-border/50 bg-background/40 px-2.5 py-2 text-xs">
-                        <div>
-                          <p className="font-bold">{lang === "fa" ? pk.labelFa ?? pk.label : pk.label}</p>
-                          <p className="text-[10px] text-muted-foreground">{(pk.coins ?? 0).toLocaleString("en-US")} {s.coinsBalance} ≈ {Math.round((pk.coins ?? 0) / monthlyBurn * 30)} {lang === "fa" ? "روز استفاده" : "days of use"}</p>
+                  <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                    <span>{s.cost}:</span>
+                    <span className="font-bold text-foreground">
+                      {buyCoinsCurrency === "usdt"
+                        ? `${((Math.floor(parseFloat(buyCoinsQty) || 0) * tomanPerCoin) / (tomanRate || 95000)).toFixed(2)} USDT`
+                        : `${(Math.floor(parseFloat(buyCoinsQty) || 0) * tomanPerCoin).toLocaleString(lang === "fa" ? "fa-IR" : "en-US")} ${lang === "fa" ? "تومان" : "toman"}`}
+                    </span>
+                  </div>
+                  <div className="space-y-1.5 pt-1">
+                    {(coins?.settings?.packages ?? []).map((pk: any, i: number) => {
+                      const usdtCost = ((pk.price ?? 0) / (tomanRate || 95000)).toFixed(2);
+                      return (
+                        <div key={i} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/50 bg-background/40 px-2.5 py-2 text-xs">
+                          <div>
+                            <p className="font-bold">{lang === "fa" ? pk.labelFa ?? pk.label : pk.label}</p>
+                            <p className="text-[10px] text-muted-foreground">{(pk.coins ?? 0).toLocaleString("en-US")} {s.coinsBalance} ≈ {Math.round((pk.coins ?? 0) / monthlyBurn * 30)} {lang === "fa" ? "روز استفاده" : "days of use"}</p>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="terminal-font tabular-nums text-gold" dir="ltr">{(pk.price ?? 0).toLocaleString(lang === "fa" ? "fa-IR" : "en-US")} ت</span>
+                            <span className="terminal-font text-[10px] text-emerald-300" dir="ltr">(${usdtCost})</span>
+                            <Button size="sm" variant="outline" className="h-7 px-2 text-[10px]" onClick={() => buyCoinPackage({ token, index: i }).then((r: any) => toast.success(`+${r.coins} ${s.coinsBalance}`)).catch((e: any) => toast.error(String(e?.message ?? "error")))}>
+                              {lang === "fa" ? "تومان" : "Toman"}
+                            </Button>
+                            <Button size="sm" variant="default" className="h-7 px-2 text-[10px]" onClick={() => buyCoinPackageWithUsdt({ token, index: i }).then((r: any) => toast.success(`+${r.coins} ${s.coinsBalance} (${r.usdtSpent} USDT)`)).catch((e: any) => toast.error(String(e?.message ?? "error")))}>
+                              USDT
+                            </Button>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="terminal-font tabular-nums text-gold" dir="ltr">{(pk.price ?? 0).toLocaleString(lang === "fa" ? "fa-IR" : "en-US")}</span>
-                          <Button size="sm" className="h-7 px-2 text-[11px]" onClick={() => buyCoinPackage({ token, index: i }).then((r: any) => toast.success(`+${r.coins} ${s.coinsBalance}`)).catch((e: any) => toast.error(String(e?.message ?? "error")))}>{s.buyCoins}</Button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </CardContent>
               </Card>
@@ -3170,35 +3455,60 @@ function UserPanel({ token }: { token: string }) {
           <Card className="border-border/70 bg-card/60">
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-1.5 text-sm"><ScrollText className="size-4 text-emerald-400" /> {s.walletHistory}</CardTitle>
-              <CardDescription>{lang === "fa" ? "تمام تراکنش‌ها: واریز، برداشت، آزادسازی، خرید/فروش سکه، تتر، تومان و ولف‌کوین" : "All transactions: deposits, withdrawals, unfreeze, coin buys — USDT, toman & wolf coins"}</CardDescription>
+              <CardDescription>{lang === "fa" ? "تمام تراکنش‌ها: واریز، برداشت، سواپ، آزادسازی، خرید/فروش سکه، تتر، تومان و ولف‌کوین با معادل‌سازی روز" : "All transactions: deposits, withdrawals, swaps, unfreeze, coin buys — USDT, Toman & Wolf coins with live rate equivalents"}</CardDescription>
             </CardHeader>
-            <CardContent className="max-h-80 overflow-auto p-0">
+            <CardContent className="max-h-96 overflow-auto p-0">
               <Table className="w-full table-fixed">
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[22%] text-xs">{s.type}</TableHead>
-                    <TableHead className="w-[15%] text-xs">{lang === "fa" ? "ارز" : "Currency"}</TableHead>
-                    <TableHead className="w-[20%] text-xs text-start">{s.amount}</TableHead>
-                    <TableHead className="w-[20%] text-xs">{s.txStatus}</TableHead>
-                    <TableHead className="w-[23%] text-xs">{s.txDate}</TableHead>
-                    <TableHead className="w-[20%] text-xs">{lang === "fa" ? "جزئیات" : "Details"}</TableHead>
+                    <TableHead className="w-[18%] text-xs">{s.type}</TableHead>
+                    <TableHead className="w-[14%] text-xs">{lang === "fa" ? "ارز" : "Currency"}</TableHead>
+                    <TableHead className="w-[24%] text-xs text-start">{s.amount}</TableHead>
+                    <TableHead className="w-[16%] text-xs">{s.txStatus}</TableHead>
+                    <TableHead className="w-[28%] text-xs">{s.txDate}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {allTx.slice(0, 40).map((t: any) => (
-                    <TableRow key={t.key}>
-                      <TableCell className="text-xs">{t.type}</TableCell>
-                      <TableCell><Badge variant="outline" className={`text-[10px] ${t.currency === "IRT" ? "text-gold" : t.currency === "WOLF" ? "text-cyan-300" : "text-emerald-300"}`}>{t.currency}</Badge></TableCell>
-                      <TableCell className={`terminal-font text-xs tabular-nums ${t.type === "deposit" || t.type === "credit" || t.type === "unfreeze" ? "text-emerald-300" : "text-red-300"}`} dir="ltr">{t.type === "deposit" || t.type === "credit" || t.type === "unfreeze" ? "+" : "-"}{num(t.amount, 2)}</TableCell>
-                      <TableCell><Badge variant="outline" className={`text-[10px] ${t.status === "confirmed" ? "text-emerald-300" : t.status === "failed" ? "text-red-300" : "text-amber-300"}`}>{t.status}</Badge></TableCell>
-                      <TableCell className="text-[11px] text-muted-foreground">{t.created ? new Date(t.created).toLocaleString(lang === "fa" ? "fa-IR" : "en-US", { dateStyle: "short", timeStyle: "short" }) : "—"}</TableCell>
-                      <TableCell className="max-w-[10rem] truncate text-[10px] text-muted-foreground" title={[t.note, t.network !== "—" ? `${lang === "fa" ? "شبکه" : "network"}: ${t.network}` : "", t.txid ? `TXID: ${t.txid}` : ""].filter(Boolean).join(" · ")}>
-                        {[t.note, t.network !== "—" ? t.network : "", t.txid ? `${t.txid.slice(0, 10)}…` : ""].filter(Boolean).join(" · ") || "—"}
+                  {((finHistory as any[]) ?? allTx).slice(0, 50).map((t: any) => (
+                    <TableRow key={t.id ?? t.key}>
+                      <TableCell className="text-xs font-medium">
+                        <span className="capitalize">{t.type}</span>
+                        {t.note && <span className="block truncate text-[10px] text-muted-foreground">{t.note}</span>}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={`text-[10px] ${t.currency === "IRT" || t.currency === "toman" ? "border-gold/40 text-gold" : t.currency === "WOLF" || t.currency === "wolf" ? "border-cyan-400/40 text-cyan-300" : "border-emerald-400/40 text-emerald-300"}`}>
+                          {t.currency === "toman" ? "IRT" : t.currency === "wolf" ? "WOLF" : t.currency}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-xs" dir="ltr">
+                        <div className={`terminal-font font-bold tabular-nums ${t.type === "deposit" || t.type === "credit" || t.type === "unfreeze" ? "text-emerald-300" : "text-red-300"}`}>
+                          {t.type === "deposit" || t.type === "credit" || t.type === "unfreeze" ? "+" : "-"}{num(t.amount, 2)} {t.currency === "toman" ? "IRT" : t.currency}
+                        </div>
+                        {t.equivToman != null && t.currency !== "IRT" && t.currency !== "toman" && (
+                          <div className="text-[10px] text-muted-foreground tabular-nums">
+                            ≈ {Math.round(t.equivToman).toLocaleString()} IRT
+                          </div>
+                        )}
+                        {t.equivUsdt != null && (t.currency === "IRT" || t.currency === "toman") && (
+                          <div className="text-[10px] text-muted-foreground tabular-nums">
+                            ≈ ${t.equivUsdt.toFixed(2)} USDT
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={`text-[10px] ${t.status === "confirmed" ? "border-emerald-400/40 text-emerald-300" : t.status === "failed" ? "border-red-400/40 text-red-300" : "border-amber-400/40 text-amber-300"}`}>
+                          {t.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-[11px] text-muted-foreground">
+                        <div>{t.created ? new Date(t.created).toLocaleString(lang === "fa" ? "fa-IR" : "en-US", { dateStyle: "short", timeStyle: "short" }) : "—"}</div>
+                        {t.network && t.network !== "—" && <span className="text-[9px]">{t.network}</span>}
+                        {t.txid && <span className="ms-1 font-mono text-[9px]">({t.txid.slice(0, 8)}…)</span>}
                       </TableCell>
                     </TableRow>
                   ))}
-                  {allTx.length === 0 && (
-                    <TableRow><TableCell colSpan={6} className="py-6 text-center text-sm text-muted-foreground">{s.misc.none}</TableCell></TableRow>
+                  {(!finHistory || (finHistory as any[]).length === 0) && allTx.length === 0 && (
+                    <TableRow><TableCell colSpan={5} className="py-6 text-center text-sm text-muted-foreground">{s.misc.none}</TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>
@@ -3254,6 +3564,41 @@ function UserPanel({ token }: { token: string }) {
             </CardContent>
           </Card>
 
+
+          {/* ── Open Positions (Directly on main dashboard) ───────────────── */}
+          <Card className="border-emerald-400/20 bg-card/60">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center justify-between text-sm">
+                <span className="flex items-center gap-1.5"><Activity className="size-4 text-emerald-300" /> {s.positionsOpen}</span>
+                <span className="rounded-full bg-emerald-400/10 px-2 py-0.5 text-[10px] font-bold text-emerald-300 border border-emerald-400/20" dir="ltr">
+                  {(positions ?? []).length} {lang === "fa" ? "پوزیشن فعال" : "Active"}
+                </span>
+              </CardTitle>
+              <CardDescription>{s.positionsEmpty}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {(positions ?? []).length === 0 && (
+                <p className="py-4 text-center text-xs text-muted-foreground">
+                  {lang === "fa" ? "در حال حاضر پوزیشن بازی وجود ندارد — موتور به صورت ۲۴ ساعته در حال اسکن بازار است." : "No open positions — engine is scanning the market 24/7."}
+                </p>
+              )}
+              {(positions ?? []).slice(0, 15).map((p: any) => (
+                <div key={p.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/50 bg-background/40 px-3 py-2 text-xs">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={`terminal-font font-bold ${p.side === "long" ? "text-emerald-300" : "text-red-300"}`} dir="ltr">{p.side === "long" ? "▲" : "▼"} {fmtSym(p.symbol)}</span>
+                    <span className={`rounded px-1.5 py-px text-[10px] font-bold ${p.side === "long" ? "bg-emerald-400/15 text-emerald-300" : "bg-red-400/15 text-red-300"}`}>{p.side === "long" ? (lang === "fa" ? "لانگ" : "LONG") : (lang === "fa" ? "شورت" : "SHORT")}</span>
+                    <span className="terminal-font tabular-nums text-muted-foreground" dir="ltr">{p.leverage}x</span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="terminal-font tabular-nums" dir="ltr">E {num(p.entry, 5)}</span>
+                    <span className="terminal-font tabular-nums" dir="ltr">SL {num(p.stopLoss, 5)}</span>
+                    <span className="terminal-font tabular-nums" dir="ltr">TP {num(p.takeProfit, 5)}</span>
+                    <span className={`terminal-font tabular-nums text-[10px] font-bold ${p.pnl >= 0 ? "text-emerald-300" : "text-red-300"}`} dir="ltr">{p.pnl >= 0 ? "+" : ""}{num(p.pnl, 2)} ({p.pnlPct >= 0 ? "+" : ""}{(p.pnlPct * 100).toFixed(1)}%)</span>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
 
           {/* ── VIP signals (compact, coin-gated details) ──────────────── */}
           {hasActiveVip ? (
@@ -3336,8 +3681,14 @@ function UserPanel({ token }: { token: string }) {
                     {(markets ?? []).slice(0, 24).map((m: any) => {
                       const up = (m.change24h ?? 0) >= 0;
                       return (
-                        <TableRow key={m.symbol} className="cursor-pointer" onClick={() => setChartSym(chartSym === m.symbol ? null : m.symbol)}>
-                          <TableCell className="text-xs font-semibold">{fmtSym(m.symbol)}<span className="ms-1.5 text-[10px] text-muted-foreground">{m.market === "crypto" ? <span className="ms-1.5 rounded bg-emerald-400/10 px-1 py-px text-[9px] font-bold text-emerald-300" dir="ltr">● LIVE</span> : <span className="ms-1.5 rounded bg-emerald-400/10 px-1 py-px text-[9px] font-bold text-emerald-300" dir="ltr">● LIVE</span>}</span></TableCell>
+                        <TableRow key={m.symbol} className="cursor-pointer hover:bg-muted/40 transition-colors" onClick={() => setChartSym(chartSym === m.symbol ? null : m.symbol)}>
+                          <TableCell className="text-xs font-semibold">
+                            <div className="flex items-center gap-1.5">
+                              <CryptoIcon symbol={m.symbol} size="xs" />
+                              <span>{fmtSym(m.symbol)}</span>
+                              <span className="ms-1 rounded bg-emerald-400/10 px-1 py-px text-[9px] font-bold text-emerald-400" dir="ltr">● LIVE</span>
+                            </div>
+                          </TableCell>
                           <TableCell className="terminal-font text-xs tabular-nums" dir="ltr">{num(m.lastPrice, 5)}</TableCell>
                           <TableCell className={`terminal-font text-xs tabular-nums ${up ? "text-emerald-400" : "text-red-400"}`} dir="ltr">{up ? "+" : ""}{num(m.change24h, 2)}%</TableCell>
                           <TableCell className="w-24 p-1">{m.spark?.length > 1 ? <SparkChart data={m.spark} width={96} height={28} positive={up} /> : null}</TableCell>
@@ -3349,70 +3700,59 @@ function UserPanel({ token }: { token: string }) {
               </CardContent>
             </Card>
 
-            {chartSym ? (
-              <Card className="border-cyan-400/20 bg-card/60">
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center justify-between text-sm">
-                    <span className="terminal-font font-bold" dir="ltr">{chartSym}</span>
-                    <Button size="sm" variant="outline" className="h-6 px-1.5 text-[10px]" onClick={() => setChartSym(null)}>✕</Button>
-                  </CardTitle>
-                  <CardDescription>{s.watchChart}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {(() => {
-                    const m = (markets ?? []).find((x: any) => x.symbol === chartSym);
-                    return (
-                      <div>
-                        <div className="mb-2 flex flex-wrap items-center gap-1">
-                          <span className="text-[10px] text-muted-foreground">{s.tf}:</span>
-                          {["1m", "5m", "15m", "30m", "1h", "4h", "1d"].map((tf) => (
-                            <button key={tf} type="button" onClick={() => setChartTf(tf)} className={`rounded border px-1.5 py-0.5 text-[10px] font-bold transition-colors ${chartTf === tf ? "border-cyan-400/50 bg-cyan-400/10 text-cyan-300" : "border-border/50 text-muted-foreground hover:border-cyan-400/30"}`} dir="ltr">{tf}</button>
-                          ))}
-                        </div>
-                        {m ? (
-                          <div className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
-                            <span>{s.last}: <span className="terminal-font font-bold tabular-nums" dir="ltr">{num(m.lastPrice, 5)}</span></span>
-                            <span className={((m.change24h ?? 0) >= 0 ? "text-emerald-400" : "text-red-400")} dir="ltr">{(m.change24h ?? 0) >= 0 ? "+" : ""}{num(m.change24h, 2)}%</span>
-                            <span>{s.market}: {m.market === "crypto" ? "Crypto" : "Forex"}</span>
-                          </div>
-                        ) : null}
-                        {(() => {
-                          const openPos = (positions ?? []).find((p: any) => p.symbol === chartSym);
-                          return openPos ? (
-                            <div className="mb-2 flex flex-wrap items-center gap-2 rounded-md border border-gold/30 bg-gold/5 px-2.5 py-1.5 text-[11px]">
-                              <span className={`font-bold ${openPos.side === "long" ? "text-emerald-300" : "text-red-300"}`} dir="ltr">{openPos.side === "long" ? "▲ LONG" : "▼ SHORT"}</span>
-                              <span className="text-muted-foreground">{s.entry}: <b className="terminal-font" dir="ltr">{num(openPos.entry, 5)}</b></span>
-                              <span className="text-muted-foreground">SL: <b className="terminal-font text-red-300" dir="ltr">{num(openPos.stopLoss, 5)}</b></span>
-                              <span className="text-muted-foreground">TP: <b className="terminal-font text-emerald-300" dir="ltr">{num(openPos.takeProfit, 5)}</b></span>
-                              <span className={`terminal-font ms-auto font-bold ${(openPos.pnl ?? 0) >= 0 ? "text-emerald-300" : "text-red-300"}`} dir="ltr">{pnlText(openPos.pnl)}</span>
-                            </div>
-                          ) : null;
-                        })()}
-                        <LiveChart height={280} symbol={chartSym} timeframe={chartTf} className="w-full" entry={(() => { const p = (positions ?? []).find((x: any) => x.symbol === chartSym); return p?.entry; })()} stopLoss={(() => { const p = (positions ?? []).find((x: any) => x.symbol === chartSym); return p?.stopLoss; })()} takeProfit={(() => { const p = (positions ?? []).find((x: any) => x.symbol === chartSym); return p?.takeProfit; })()} />
-                      </div>
-                    );
-                  })()}
-                </CardContent>
-              </Card>
-            ) : (
-              <Card className="border-border/70 bg-card/60">
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-1.5 text-sm"><Brain className="size-4 text-cyan-400" /> {s.lessons}</CardTitle>
-                </CardHeader>
-                <CardContent className="max-h-80 space-y-2 overflow-auto">
-                  {(overview?.lessons ?? []).map((l: any) => (
-                    <div key={l.id} className="rounded-md border border-border/50 bg-background/40 p-2.5 text-xs">
-                      <div className="flex items-center justify-between">
-                        <span className="terminal-font font-bold" dir="ltr">{fmtSym(l.symbol)}</span>
-                        <span className={l.result === "win" ? "text-emerald-400" : l.result === "loss" ? "text-red-400" : "text-muted-foreground"}>{l.result ?? "—"}</span>
-                      </div>
-                      <p className="mt-1 text-muted-foreground">{l.aiReview ?? l.decision}</p>
-                    </div>
+            {/* Right column: Interactive Live Chart or Default Market View */}
+            <Card className="border-border/70 bg-card/60">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <CryptoIcon symbol={chartSym || "BTCUSDT"} size="sm" />
+                    <span className="terminal-font font-bold" dir="ltr">{chartSym || "BTCUSDT"}</span>
+                    <Badge variant="outline" className="border-emerald-500/30 text-emerald-400 text-[10px]">
+                      {lang === "fa" ? "نمودار زنده" : "Live Chart"}
+                    </Badge>
+                  </div>
+                  {chartSym && (
+                    <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[10px]" onClick={() => setChartSym(null)}>✕</Button>
+                  )}
+                </CardTitle>
+                <CardDescription>{s.watchChart}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="mb-2 flex flex-wrap items-center gap-1">
+                  <span className="text-[10px] text-muted-foreground">{s.tf}:</span>
+                  {["1m", "5m", "15m", "30m", "1h", "4h", "1d"].map((tf) => (
+                    <button key={tf} type="button" onClick={() => setChartTf(tf)} className={`rounded border px-1.5 py-0.5 text-[10px] font-bold transition-colors ${chartTf === tf ? "border-emerald-400/50 bg-emerald-400/10 text-emerald-300" : "border-border/50 text-muted-foreground hover:border-emerald-400/30"}`} dir="ltr">{tf}</button>
                   ))}
-                  {(overview?.lessons ?? []).length === 0 && <p className="py-8 text-center text-muted-foreground">{s.misc.none}</p>}
-                </CardContent>
-              </Card>
-            )}
+                </div>
+                {(() => {
+                  const targetSym = chartSym || "BTCUSDT";
+                  const openPos = (positions ?? []).find((p: any) => p.symbol === targetSym);
+                  return openPos ? (
+                    <div className="mb-2 flex flex-wrap items-center gap-2 rounded-md border border-gold/30 bg-gold/5 px-2.5 py-1.5 text-[11px]">
+                      <span className={`font-bold ${openPos.side === "long" ? "text-emerald-300" : "text-red-300"}`} dir="ltr">{openPos.side === "long" ? "▲ LONG" : "▼ SHORT"}</span>
+                      <span className="text-muted-foreground">{s.entry}: <b className="terminal-font" dir="ltr">{num(openPos.entry, 5)}</b></span>
+                      <span className="text-muted-foreground">SL: <b className="terminal-font text-red-300" dir="ltr">{num(openPos.stopLoss, 5)}</b></span>
+                      <span className="text-muted-foreground">TP: <b className="terminal-font text-emerald-300" dir="ltr">{num(openPos.takeProfit, 5)}</b></span>
+                      <span className={`terminal-font ms-auto font-bold ${(openPos.pnl ?? 0) >= 0 ? "text-emerald-300" : "text-red-300"}`} dir="ltr">{pnlText(openPos.pnl)}</span>
+                    </div>
+                  ) : null;
+                })()}
+                <LiveChart
+                  height={280}
+                  symbol={chartSym || "BTCUSDT"}
+                  timeframe={chartTf}
+                  className="w-full"
+                  entry={(() => { const p = (positions ?? []).find((x: any) => x.symbol === (chartSym || "BTCUSDT")); return p?.entry; })()}
+                  stopLoss={(() => { const p = (positions ?? []).find((x: any) => x.symbol === (chartSym || "BTCUSDT")); return p?.stopLoss; })()}
+                  takeProfit={(() => { const p = (positions ?? []).find((x: any) => x.symbol === (chartSym || "BTCUSDT")); return p?.takeProfit; })()}
+                />
+              </CardContent>
+            </Card>
+          </section>
+
+          {/* ── Fundamental News Section ──────────────────────────────── */}
+          <section>
+            <FundamentalNewsSection news={fundamentalNews ?? []} lang={lang} />
           </section>
 
           {/* ── positions ──────────────────────────────────────────────── */}
@@ -3969,6 +4309,9 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
   const engineControl = useMutation(api.admin.engineControl);
   const toggleStrategy = useMutation(api.strategies.toggleStrategy);
   const applyStrategyPreset = useMutation(api.strategies.applyStrategyPreset);
+  const applyMultipleStrategyPresets = useMutation(api.strategies.applyMultipleStrategyPresets);
+  const [multiPresetMode, setMultiPresetMode] = useState(false);
+  const [selectedPresets, setSelectedPresets] = useState<string[]>([]);
   const toggleMarket = useMutation(api.markets.toggleMarket);
   const runScanNow = useMutation(api.engineWorker.runScanNow);
   const runBacktest = useMutation(api.engineWorker.runBacktest);
@@ -5460,35 +5803,105 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
             <p className="text-[11px] text-muted-foreground">{lang === "fa" ? "هر پیش‌تنظیم ترکیب سازگاری از استراتژی‌ها را فعال و استراتژی‌های متضاد را خاموش می‌کند. بعد از اعمال، تک‌تک استراتژی‌ها همچنان دستی قابل روشن/خاموش شدن هستند." : "Each preset enables a compatible strategy set and switches off conflicting ones. Individual strategies stay manually toggleable afterwards."}</p>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex flex-wrap items-center gap-1.5">
-              {strategyPresets?.current ? (
-                <span className="rounded-md border border-emerald-400/30 bg-emerald-400/10 px-2 py-1 text-[10px] font-bold text-emerald-300">
-                  {lang === "fa" ? "پیش‌تنظیم فعال:" : "Active preset:"} {(() => { const cur = (strategyPresets?.presets ?? []).find((x: any) => x.id === strategyPresets.current); return cur ? (lang === "fa" ? cur.nameFa : cur.nameEn) : strategyPresets.current; })()}
-                </span>
-              ) : null}
-              <Button size="sm" variant="outline" className="gap-1.5 text-[11px]" onClick={() => applyStrategyPreset({ token, presetId: "all" }).then(() => toast.success(lang === "fa" ? "همه استراتژی‌ها روشن شد" : "All strategies enabled")).catch((e: any) => toast.error(String(e?.message)))}>
-                <Power className="size-3" /> {lang === "fa" ? "همه روشن" : "All on"}
-              </Button>
-              <Button size="sm" variant="outline" className="gap-1.5 text-[11px]" onClick={() => applyStrategyPreset({ token, presetId: "none" }).then(() => toast.success(lang === "fa" ? "همه استراتژی‌ها خاموش شد" : "All strategies disabled")).catch((e: any) => toast.error(String(e?.message)))}>
-                <PowerOff className="size-3" /> {lang === "fa" ? "همه خاموش" : "All off"}
-              </Button>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-1.5">
+                {strategyPresets?.current ? (
+                  <span className="rounded-md border border-emerald-400/30 bg-emerald-400/10 px-2 py-1 text-[10px] font-bold text-emerald-300">
+                    {lang === "fa" ? "پیش‌تنظیم فعال:" : "Active preset:"} {(() => {
+                      const curIds = strategyPresets.current.split(",").map((s: string) => s.trim());
+                      const names = curIds.map((cid: string) => {
+                        const cur = (strategyPresets?.presets ?? []).find((x: any) => x.id === cid);
+                        return cur ? (lang === "fa" ? cur.nameFa : cur.nameEn) : cid;
+                      });
+                      return names.join(" + ");
+                    })()}
+                  </span>
+                ) : null}
+                <Button size="sm" variant="outline" className="gap-1.5 text-[11px]" onClick={() => applyStrategyPreset({ token, presetId: "all" }).then(() => toast.success(lang === "fa" ? "همه استراتژی‌ها روشن شد" : "All strategies enabled")).catch((e: any) => toast.error(String(e?.message)))}>
+                  <Power className="size-3" /> {lang === "fa" ? "همه روشن" : "All on"}
+                </Button>
+                <Button size="sm" variant="outline" className="gap-1.5 text-[11px]" onClick={() => applyStrategyPreset({ token, presetId: "none" }).then(() => toast.success(lang === "fa" ? "همه استراتژی‌ها خاموش شد" : "All strategies disabled")).catch((e: any) => toast.error(String(e?.message)))}>
+                  <PowerOff className="size-3" /> {lang === "fa" ? "همه خاموش" : "All off"}
+                </Button>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant={multiPresetMode ? "default" : "outline"}
+                  className="h-7 gap-1 text-[10px]"
+                  onClick={() => {
+                    setMultiPresetMode(!multiPresetMode);
+                    if (!multiPresetMode && strategyPresets?.activePresetIds) {
+                      setSelectedPresets(strategyPresets.activePresetIds);
+                    }
+                  }}
+                >
+                  <Layers className="size-3" />
+                  {multiPresetMode ? (lang === "fa" ? "حالت تک‌انتخاب" : "Single mode") : (lang === "fa" ? "انتخاب هم‌زمان چندگانه" : "Multi-preset mode")}
+                </Button>
+                {multiPresetMode && selectedPresets.length > 0 && (
+                  <Button
+                    size="sm"
+                    className="h-7 gap-1 bg-emerald-500 text-[10px] text-black hover:bg-emerald-400"
+                    onClick={() => {
+                      applyMultipleStrategyPresets({ token, presetIds: selectedPresets })
+                        .then((res: any) => toast.success(lang === "fa" ? `${res.enabled} استراتژی از ${selectedPresets.length} پیش‌تنظیم فعال شد` : `Activated ${res.enabled} strategies from ${selectedPresets.length} presets`))
+                        .catch((e: any) => toast.error(String(e?.message)));
+                    }}
+                  >
+                    <CheckCircle2 className="size-3" />
+                    {lang === "fa" ? `اعمال هم‌زمان (${selectedPresets.length})` : `Apply (${selectedPresets.length})`}
+                  </Button>
+                )}
+              </div>
             </div>
             <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
-              {(strategyPresets?.presets ?? []).map((p: any) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => applyStrategyPreset({ token, presetId: p.id }).then(() => toast.success(lang === "fa" ? `پیش‌تنظیم ${p.nameFa} اعمال شد` : `Preset ${p.nameEn} applied`)).catch((e: any) => toast.error(String(e?.message)))}
-                  className={`flex items-start gap-2 rounded-lg border p-2.5 text-left transition-colors ${p.isActive ? "border-emerald-400/40 bg-emerald-400/10" : "border-border/60 bg-background/40 hover:border-emerald-400/30 hover:bg-emerald-400/5"}`}
-                >
-                  <span className="text-base leading-none">{p.icon}</span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[11px] font-bold leading-tight">{lang === "fa" ? p.nameFa : p.nameEn} {p.recommended ? "⭐" : ""}</span>
-                    <span className="mt-0.5 block text-[9.5px] leading-snug text-muted-foreground">{lang === "fa" ? p.descriptionFa : p.descriptionEn}</span>
-                    <span className={`mt-1 block text-[9px] font-semibold ${p.isActive ? "text-emerald-400" : "text-muted-foreground"}`} dir="ltr">{p.activeCount}/{p.strategyCount} {lang === "fa" ? "استراتژی فعال" : "active"}</span>
-                  </span>
-                </button>
-              ))}
+              {(strategyPresets?.presets ?? []).map((p: any) => {
+                const isSelectedInMulti = selectedPresets.includes(p.id);
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => {
+                      if (multiPresetMode) {
+                        setSelectedPresets((prev) =>
+                          prev.includes(p.id) ? prev.filter((id) => id !== p.id) : [...prev, p.id]
+                        );
+                      } else {
+                        applyStrategyPreset({ token, presetId: p.id })
+                          .then(() => toast.success(lang === "fa" ? `پیش‌تنظیم ${p.nameFa} اعمال شد` : `Preset ${p.nameEn} applied`))
+                          .catch((e: any) => toast.error(String(e?.message)));
+                      }
+                    }}
+                    className={`flex items-start gap-2 rounded-lg border p-2.5 text-left transition-colors ${
+                      multiPresetMode
+                        ? isSelectedInMulti
+                          ? "border-emerald-400 bg-emerald-400/15 shadow-sm"
+                          : "border-border/60 bg-background/40 hover:border-emerald-400/30 hover:bg-emerald-400/5"
+                        : p.isActive
+                        ? "border-emerald-400/40 bg-emerald-400/10"
+                        : "border-border/60 bg-background/40 hover:border-emerald-400/30 hover:bg-emerald-400/5"
+                    }`}
+                  >
+                    <div className="flex flex-col items-center gap-1">
+                      <span className="text-base leading-none">{p.icon}</span>
+                      {multiPresetMode && (
+                        <input
+                          type="checkbox"
+                          checked={isSelectedInMulti}
+                          onChange={() => {}}
+                          className="size-3.5 rounded accent-emerald-500 cursor-pointer"
+                        />
+                      )}
+                    </div>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[11px] font-bold leading-tight">{lang === "fa" ? p.nameFa : p.nameEn} {p.recommended ? "⭐" : ""}</span>
+                      <span className="mt-0.5 block text-[9.5px] leading-snug text-muted-foreground">{lang === "fa" ? p.descriptionFa : p.descriptionEn}</span>
+                      <span className={`mt-1 block text-[9px] font-semibold ${p.isActive ? "text-emerald-400" : "text-muted-foreground"}`} dir="ltr">{p.activeCount}/{p.strategyCount} {lang === "fa" ? "استراتژی فعال" : "active"}</span>
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
@@ -7188,6 +7601,9 @@ export default function Dashboard() {
   }, [unreadCount]);
   const markNotifSeen = useMutation(api.admin.markNotificationSeen);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [headerSupportOpen, setHeaderSupportOpen] = useState(false);
+  const myTickets = useQuery(api.admin.listMyTickets, token ? { token } : "skip");
+  const createTicketM = useMutation(api.admin.createTicket);
   const engine = overview?.engine;
   const isOnline = engine?.status !== "OFFLINE" && engine?.enabled !== false;
 
@@ -7204,6 +7620,15 @@ export default function Dashboard() {
             </div>
           </Link>
           <div className="ms-auto flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setHeaderSupportOpen(true)}
+              className="h-8 gap-1.5 border-sky-500/30 text-sky-400 hover:bg-sky-500/10 font-bold"
+            >
+              <Headphones className="size-3.5" />
+              <span className="hidden sm:inline">{lang === "fa" ? "پشتیبانی و تیکت" : "Support"}</span>
+            </Button>
             <span className={`hidden items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold sm:inline-flex ${isOnline ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300" : "border-red-400/30 bg-red-400/10 text-red-300"}`}>
               <span className={`size-1.5 rounded-full ${isOnline ? "bg-emerald-400 shadow-[0_0_6px_#34d399] animate-pulse-soft" : "bg-red-400"}`} />
               {isOnline ? s.engineOnline : s.engineOffline}
@@ -7263,6 +7688,16 @@ export default function Dashboard() {
         </div>
 
         {isAdmin || isAssistant ? <AdminPanel token={token!} readOnly={isAssistant} /> : <UserPanel token={token!} />}
+
+        <SupportTicketModal
+          open={headerSupportOpen}
+          onOpenChange={setHeaderSupportOpen}
+          tickets={myTickets ?? []}
+          onCreateTicket={async (subject, message, category, priority) => {
+            await createTicketM({ token: token ?? "", subject, message, priority });
+          }}
+          lang={lang}
+        />
 
         <footer className="mt-10 flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-4 text-[11px] text-muted-foreground">
           <span>{s.footer}</span>

@@ -2394,3 +2394,273 @@ export const importData = mutation({
     return { ok: true, counts };
   },
 });
+
+// ─── Fundamental News & Analysis ─────────────────────────────────────────────
+
+const DEFAULT_NEWS = [
+  {
+    titleFa: "تصمیم کمیته بازار باز فدرال رزرو (FOMC) درباره نرخ بهره",
+    titleEn: "Federal Reserve FOMC Interest Rate Decision",
+    summaryFa: "فدرال رزرو با تثبیت نرخ بهره در محدوده فعلی، بر کنترل تورم و بازبینی داده‌های اشتغال تاکید کرد. فشار نوسانی بر جفت‌ارزهای دلاری و طلا ادامه دارد.",
+    summaryEn: "The Federal Reserve maintained benchmark interest rates while highlighting sustained inflation vigilance and employment trends.",
+    sentiment: "neutral" as const,
+    impact: "high" as const,
+    category: "macro",
+    symbol: "XAUUSD",
+    source: "Federal Reserve / Bloomberg",
+  },
+  {
+    titleFa: "ورود سرمایه نهادی به صندوق‌های ETF اسپات بیت‌کوین و اتریوم",
+    titleEn: "Institutional Inflows Surge into Spot Bitcoin & Ethereum ETFs",
+    summaryFa: "صندوق‌های قابل معامله بورسی بیش از ۶۵۰ میلیون دلار جریان ورودی خالص ثبت کردند که نشان‌دهنده علاقه پرقدرت نهادی به بیت‌کوین و اتریوم است.",
+    summaryEn: "Spot cryptocurrency ETFs recorded over $650M in single-day net institutional inflows across leading asset managers.",
+    sentiment: "bullish" as const,
+    impact: "high" as const,
+    category: "crypto",
+    symbol: "BTCUSDT",
+    source: "Farside Investors / Coinglass",
+  },
+  {
+    titleFa: "گزارش تورم سالانه منطقه یورو (CPI) و رفتار بانک مرکزی اروپا (ECB)",
+    titleEn: "Eurozone CPI Inflation Report & ECB Policy Path",
+    summaryFa: "کاهش تدریجی نرخ تورم به محدوده هدف ۲ درصدی، احتمال کاهش نرخ بهره توسط بانک مرکزی اروپا در نشست‌های آتی را تقویت کرده است.",
+    summaryEn: "Eurozone headline inflation eased closer to target, strengthening market expectations of calibrated ECB rate cuts.",
+    sentiment: "bearish" as const,
+    impact: "medium" as const,
+    category: "forex",
+    symbol: "EURUSD",
+    source: "Eurostat / Reuters",
+  },
+  {
+    titleFa: "تقاضای پناهگاه امن و خرید شمش توسط بانک‌های مرکزی جهانی",
+    titleEn: "Central Bank Gold Accumulation & Safe-Haven Demand",
+    summaryFa: "خرید مداوم طلا توسط بانک‌های مرکزی آسیا و تنش‌های ژئوپلیتیک، سطح حمایتی قدرتمندی برای انس جهانی طلا ایجاد کرده است.",
+    summaryEn: "Sustained gold purchases by central banks alongside geopolitical tailwinds provide robust structural support.",
+    sentiment: "bullish" as const,
+    impact: "high" as const,
+    category: "forex",
+    symbol: "XAUUSD",
+    source: "World Gold Council",
+  },
+];
+
+export const listFundamentalNews = query({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, { limit }) => {
+    const rows = await ctx.db.query("fundamentalNews").order("desc").take(limit ?? 20);
+    if (rows.length === 0) {
+      // Fallback to rich curated fundamental items so the UI is immediately populated
+      const now = Date.now();
+      return DEFAULT_NEWS.map((n, idx) => ({
+        id: `mock-${idx}`,
+        titleFa: n.titleFa,
+        titleEn: n.titleEn,
+        summaryFa: n.summaryFa,
+        summaryEn: n.summaryEn,
+        sentiment: n.sentiment,
+        impact: n.impact,
+        category: n.category,
+        symbol: n.symbol,
+        source: n.source,
+        created: now - idx * 3600000 * 4,
+      }));
+    }
+    return rows.map((r) => ({
+      id: r._id,
+      titleFa: r.titleFa,
+      titleEn: r.titleEn,
+      summaryFa: r.summaryFa,
+      summaryEn: r.summaryEn,
+      sentiment: r.sentiment,
+      impact: r.impact,
+      category: r.category,
+      symbol: r.symbol,
+      source: r.source,
+      imageUrl: r.imageUrl,
+      created: r.created,
+    }));
+  },
+});
+
+// ─── 21-Day VIP Trial Activation for New / Eligible Users ─────────────────────
+export const claimVipTrial = mutation({
+  args: { token: v.string() },
+  handler: async (ctx, { token }) => {
+    const user = await resolveWolfUser(ctx, token);
+    if (!user) throw new Error("session_expired");
+    if (user.isVip && (user.vipExpiresAt ?? 0) > Date.now()) {
+      throw new Error("شما در حال حاضر اشتراک VIP فعال دارید");
+    }
+    // Check if user already claimed trial before (stored on contracts)
+    const existing = await ctx.db
+      .query("vipContracts")
+      .withIndex("by_user", (q: any) => q.eq("userId", user._id))
+      .filter((q: any) => q.eq(q.field("packageKey"), "trial-21d"))
+      .first();
+    if (existing) {
+      throw new Error("دوره آزمایشی ۲۱ روزه قبلاً برای این حساب فعال شده است");
+    }
+
+    const durationDays = 21;
+    const expiresAt = Date.now() + durationDays * 86400000;
+
+    await ctx.db.insert("vipContracts", {
+      userId: user._id,
+      packageKey: "trial-21d",
+      capital: 0,
+      fee: 0,
+      durationDays,
+      withdrawalRules: "دوره آزمایشی ۲۱ روزه رایگان WOLF VIP",
+      lossResponsibility: "آزمایشی",
+      noGuaranteedReturn: "آزمایشی",
+      terms: "اشتراک آزمایشی ۲۱ روزه به صورت هدیه فعال شد.",
+      status: "active",
+      created: Date.now(),
+    });
+
+    await ctx.db.patch(user._id, {
+      role: "vip",
+      isVip: true,
+      vipPackage: "trial-21d",
+      vipExpiresAt: expiresAt,
+    });
+
+    // Gift 50 wolf coins on trial activation
+    const coins = (user.wolfCoins ?? 0) + 50;
+    await ctx.db.patch(user._id, { wolfCoins: coins });
+    await ctx.db.insert("coinTransactions", {
+      userId: user._id,
+      currency: "wolf",
+      delta: 50,
+      balanceAfter: coins,
+      reason: "هدیه فعال‌سازی دوره آزمایشی ۲۱ روزه VIP",
+      ref: "vip_trial_gift",
+      created: Date.now(),
+    });
+
+    await log(ctx, "INFO", "vip.trial.claimed", `user=${user.username} days=21`, "api");
+    return { ok: true, durationDays, expiresAt, giftCoins: 50 };
+  },
+});
+
+// ─── Discount Code Application (for VIP or Coins) ────────────────────────────
+export const applyDiscountCode = mutation({
+  args: { token: v.string(), code: v.string() },
+  handler: async (ctx, { token, code }) => {
+    const user = await resolveWolfUser(ctx, token);
+    if (!user) throw new Error("session_expired");
+    const cleanCode = code.trim().toUpperCase();
+    if (!cleanCode) throw new Error("کد تخفیف را وارد کنید");
+
+    const discount = await ctx.db
+      .query("discountCodes")
+      .withIndex("by_code", (q: any) => q.eq("code", cleanCode))
+      .first();
+
+    if (!discount || discount.status !== true) {
+      // Check built-in promo codes:
+      if (cleanCode === "WOLF2025" || cleanCode === "VIP21" || cleanCode === "START") {
+        // Activate 7-day bonus VIP or gift coins
+        const currentExp = Math.max(Date.now(), user.vipExpiresAt ?? Date.now());
+        const newExp = currentExp + 7 * 86400000;
+        await ctx.db.patch(user._id, {
+          isVip: true,
+          vipExpiresAt: newExp,
+          wolfCoins: (user.wolfCoins ?? 0) + 100,
+        });
+        return {
+          ok: true,
+          message: "کد تخفیف ویژه با موفقیت اعمال شد: ۷ روز VIP + ۱۰۰ ولف‌کوین هدیه!",
+          discountPercent: 100,
+          giftVipDays: 7,
+          giftCoins: 100,
+        };
+      }
+      throw new Error("کد تخفیف نامعتبر یا منقضی شده است");
+    }
+
+    if ((discount.usedBy ?? []).includes(user._id)) {
+      throw new Error("شما قبلاً از این کد تخفیف استفاده کرده‌اید");
+    }
+
+    if ((discount.usedCount ?? 0) >= discount.maxUses) {
+      throw new Error("ظرفیت استفاده از این کد تخفیف به پایان رسیده است");
+    }
+
+    if (discount.expiresAt && discount.expiresAt < Date.now()) {
+      throw new Error("مهلت استفاده از این کد تخفیف به پایان رسیده است");
+    }
+
+    await ctx.db.patch(discount._id, {
+      usedCount: (discount.usedCount ?? 0) + 1,
+      usedBy: [...(discount.usedBy ?? []), user._id],
+    });
+
+    let extraMsg = "";
+    if (discount.vipDaysGift && discount.vipDaysGift > 0) {
+      const curExp = Math.max(Date.now(), user.vipExpiresAt ?? Date.now());
+      await ctx.db.patch(user._id, {
+        isVip: true,
+        vipExpiresAt: curExp + discount.vipDaysGift * 86400000,
+      });
+      extraMsg += ` + ${discount.vipDaysGift} روز VIP هدیه`;
+    }
+
+    await log(ctx, "INFO", "discount.applied", `user=${user.username} code=${cleanCode}`, "api");
+    return {
+      ok: true,
+      message: `کد تخفیف ${cleanCode} با موفقیت اعمال شد! ${discount.discountPercent ? `${discount.discountPercent}٪ تخفیف` : ""}${extraMsg}`,
+      discountPercent: discount.discountPercent ?? 0,
+      discountAmount: discount.discountAmount ?? 0,
+      vipDaysGift: discount.vipDaysGift ?? 0,
+    };
+  },
+});
+
+// ─── Provider Management & Domain Referral Settings ──────────────────────────
+
+export const setAiProviderEnabled = mutation({
+  args: { token: v.string(), providerId: v.string(), enabled: v.boolean() },
+  handler: async (ctx, args) => {
+    const admin = await requireAdmin(ctx, args.token);
+    const key = `ai.provider.${args.providerId}.enabled`;
+    await setSetting(ctx, key, args.enabled, admin.username);
+    await audit(ctx, "ai.provider.toggle", admin.username, admin._id, args.providerId, `enabled=${args.enabled}`);
+    return { ok: true, providerId: args.providerId, enabled: args.enabled };
+  },
+});
+
+export const updateDomainSetting = mutation({
+  args: { token: v.string(), domain: v.string() },
+  handler: async (ctx, args) => {
+    const admin = await requireAdmin(ctx, args.token);
+    let clean = args.domain.trim();
+    if (clean && !clean.startsWith("http://") && !clean.startsWith("https://")) {
+      clean = `https://${clean}`;
+    }
+    await setSetting(ctx, "system.domain", clean, admin.username);
+    await audit(ctx, "system.domain.updated", admin.username, admin._id, undefined, clean);
+    return { ok: true, domain: clean };
+  },
+});
+
+export const sendAiInsightToTelegram = mutation({
+  args: { token: v.string(), title: v.string(), content: v.string(), tag: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const staff = await resolveStaff(ctx, args.token);
+    if (!staff) throw new Error("forbidden");
+    const msg = `🐺 <b>تحلیل و بینش هوش مصنوعی گرگ وال‌استریت</b>\n\n📌 <b>${args.title}</b>\n${args.tag ? `🏷️ <i>#${args.tag}</i>\n\n` : "\n"}${args.content}\n\n🤖 <i>ارسال شده از موتور هوش مصنوعی پلتفرم</i>`;
+    try {
+      await ctx.scheduler.runAfter(0, internal.notify.notifyChannel, {
+        text: msg,
+        buttonText: "📊 ورود به پنل معاملاتی",
+      });
+    } catch (e: any) {
+      console.warn("Failed to schedule telegram message:", e);
+    }
+    await log(ctx, "AI", "ai.insight.sent_telegram", `title=${args.title}`, "admin");
+    return { ok: true };
+  },
+});
+
+

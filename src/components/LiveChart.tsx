@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { CandlestickSeries, createChart, HistogramSeries, IChartApi, ISeriesApi, CandlestickData } from "lightweight-charts";
+import { CandlestickSeries, createChart, HistogramSeries, LineSeries, IChartApi, ISeriesApi, CandlestickData, LineData } from "lightweight-charts";
 
 interface Candle {
   t: number;
@@ -10,16 +10,26 @@ interface Candle {
   v: number;
 }
 
-interface Level {
+export interface Level {
   price: number;
   color: string;
   label: string;
   lineStyle?: 0 | 1 | 2 | 3;
 }
 
+export interface ChartIndicator {
+  id: string;
+  name: string;
+  type: "sma" | "ema" | "bollinger" | "vwap";
+  period?: number;
+  color?: string;
+  description?: string;
+}
+
 interface Props {
   candles?: Candle[];
   levels?: Level[];
+  indicators?: ChartIndicator[];
   width?: number;
   height?: number;
   className?: string;
@@ -29,6 +39,7 @@ interface Props {
   symbol?: string;
   direction?: string;
   timeframe?: string;
+  showTools?: boolean;
 }
 
 function tfToMs(tf: string): number {
@@ -238,6 +249,11 @@ export function LiveChart({
   if (stopLoss) levels.push({ price: stopLoss, color: "#ef4444", label: "SL", lineStyle: 2 });
   if (takeProfit) levels.push({ price: takeProfit, color: "#10b981", label: "TP", lineStyle: 2 });
 
+  const chartRef = useRef<IChartApi | null>(null);
+  const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const indicatorSeriesRef = useRef<Map<string, ISeriesApi<"Line">>>(new Map());
+  const levelsRef = useRef<any[]>([]);
+
   useEffect(() => {
     if (!containerRef.current) return;
     const chart = createChart(containerRef.current, {
@@ -273,12 +289,14 @@ export function LiveChart({
   }, []);
 
   useEffect(() => {
-    if (!seriesRef.current) return;
+    if (!seriesRef.current || !chartRef.current) return;
     const data: CandlestickData[] = candles.map((c) => ({
       time: Math.floor(c.t / 1000) as any,
       open: c.o, high: c.h, low: c.l, close: c.c,
     }));
     seriesRef.current.setData(data);
+
+    // Levels
     levelsRef.current.forEach((pl) => { try { seriesRef.current?.removePriceLine(pl); } catch {} });
     levelsRef.current = [];
     for (const lvl of levels) {
@@ -288,15 +306,81 @@ export function LiveChart({
       });
       levelsRef.current.push(pl);
     }
+
+    // Indicators rendering
+    indicatorSeriesRef.current.forEach((lineSeries) => {
+      try { chartRef.current?.removeSeries(lineSeries); } catch {}
+    });
+    indicatorSeriesRef.current.clear();
+
+    if (indicators && indicators.length > 0 && candles.length > 5) {
+      indicators.forEach((ind) => {
+        try {
+          const lineSeries = chartRef.current!.addSeries(LineSeries, {
+            color: ind.color || "#38bdf8",
+            lineWidth: 2,
+            title: ind.name,
+          });
+          const period = ind.period || (ind.type === "ema" ? 20 : 14);
+          const lineData: LineData[] = [];
+          
+          if (ind.type === "sma" || ind.type === "vwap") {
+            for (let i = period - 1; i < candles.length; i++) {
+              const slice = candles.slice(i - period + 1, i + 1);
+              const sum = slice.reduce((s, c) => s + c.c, 0);
+              lineData.push({
+                time: Math.floor(candles[i].t / 1000) as any,
+                value: sum / period,
+              });
+            }
+          } else if (ind.type === "ema") {
+            const k = 2 / (period + 1);
+            let prevEma = candles[0].c;
+            for (let i = 0; i < candles.length; i++) {
+              if (i === 0) {
+                prevEma = candles[i].c;
+              } else {
+                prevEma = candles[i].c * k + prevEma * (1 - k);
+              }
+              if (i >= period - 1) {
+                lineData.push({
+                  time: Math.floor(candles[i].t / 1000) as any,
+                  value: prevEma,
+                });
+              }
+            }
+          }
+          lineSeries.setData(lineData);
+          indicatorSeriesRef.current.set(ind.id, lineSeries);
+        } catch (e) {
+          console.warn("Indicator draw failed:", e);
+        }
+      });
+    }
+
     chartRef.current?.timeScale().fitContent();
-  }, [candles, levels]);
+  }, [candles, levels, indicators]);
 
   return (
     <div className={`relative rounded-lg overflow-hidden bg-surface/50 ${className}`} style={{ minHeight: height }}>
       {dataSource === "live" ? (
         <span className="pointer-events-none absolute top-1.5 z-10 rounded bg-emerald-400/15 px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-emerald-300" dir="ltr">● LIVE</span>
       ) : null}
+      {indicators && indicators.length > 0 ? (
+        <div className="absolute bottom-2 left-2 z-10 flex flex-wrap gap-1.5 pointer-events-none">
+          {indicators.map((ind) => (
+            <span
+              key={ind.id}
+              className="text-[10px] px-2 py-0.5 rounded backdrop-blur bg-black/60 text-slate-200 border border-slate-700/60 shadow-sm"
+              style={{ borderLeftColor: ind.color || "#38bdf8", borderLeftWidth: 3 }}
+            >
+              <b>{ind.name}</b> {ind.description ? `— ${ind.description}` : ""}
+            </span>
+          ))}
+        </div>
+      ) : null}
       <div ref={containerRef} />
     </div>
   );
 }
+

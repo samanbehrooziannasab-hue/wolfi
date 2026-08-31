@@ -85,6 +85,51 @@ export const getSwapwalletPrices = internalAction({
   },
 });
 
+/**
+ * Fetch live USDT/IRT rate from SwapWallet public OTC feed or Nobitex and persist in settings.
+ */
+export const syncSwapwalletUsdtRate = internalAction({
+  args: {},
+  handler: async (ctx): Promise<{ rate: number; source: string }> => {
+    let rate = 0;
+    let source = "none";
+    try {
+      const prices = (await ctx.runAction(internal.swapwallet.getSwapwalletPrices, {})) as Record<string, string>;
+      const usdtIrt = prices["USDT/IRT"] || prices["USDT/TOMAN"] || prices["USD/IRT"];
+      if (usdtIrt && parseFloat(usdtIrt) > 10000) {
+        rate = Math.round(parseFloat(usdtIrt));
+        source = "swapwallet";
+      }
+    } catch {
+      // fallback to Nobitex
+    }
+
+    if (!rate || rate < 10000) {
+      try {
+        const res = await fetch("https://api.nobitex.ir/market/stats?srcCurrency=usdt&dstCurrency=rls");
+        if (res.ok) {
+          const j: any = await res.json();
+          const rls = Number(j?.stats?.["usdt-rls"]?.latest ?? 0);
+          if (rls > 100000) {
+            rate = Math.round(rls / 10); // Rials to Toman
+            source = "nobitex";
+          }
+        }
+      } catch {
+        // fallback
+      }
+    }
+
+    if (rate >= 10000) {
+      await ctx.runMutation(internal.settings.writeSettings, {
+        values: { "usdt.tomanRate": rate },
+      });
+    }
+
+    return { rate, source };
+  },
+});
+
 /** Live balances for every supported token (authed). */
 export const getSwapwalletBalances = internalAction({
   args: {},

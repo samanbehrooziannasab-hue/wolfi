@@ -34,6 +34,14 @@ crons.interval(
   {},
 );
 
+// Live USDT/Toman rate sync from SwapWallet / Nobitex so wallet conversions are accurate.
+crons.interval(
+  "usdt-rate-sync",
+  { minutes: 10 },
+  internal.swapwallet.syncSwapwalletUsdtRate,
+  {},
+);
+
 // Data housekeeping: prunes old logs, AI outputs, closed trades, signals and
 // transaction rows so the database stays small and reads stay under the free
 // plan's per-function byte limits. Runs daily.
