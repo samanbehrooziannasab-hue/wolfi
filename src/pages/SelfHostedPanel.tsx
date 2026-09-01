@@ -1,4 +1,18 @@
-function asArr<T = any>(v: any): T[] { return Array.isArray(v) ? v : []; }
+function asArr<T = any>(v: any): T[] & { error?: string } {
+  if (Array.isArray(v)) {
+    const res = v as any;
+    if ((v as any).error) res.error = String((v as any).error);
+    return res;
+  }
+  const arr: T[] & { error?: string } = [] as any;
+  if (v && typeof v === "object") {
+    if (v.error) arr.error = String(v.error);
+    else if (v.message) arr.error = String(v.message);
+  } else if (typeof v === "string" && v.length > 0) {
+    arr.error = v;
+  }
+  return arr;
+}
 // ---------------------------------------------------------------------------
 // SelfHostedPanel — full dashboard for VITE_BACKEND=rest (self-hosted server/).
 // Shell mirrors the Convex admin panel (header, world clock, grouped admin nav).
@@ -89,6 +103,84 @@ function Stat({ label, value, hint }: { label: string; value: any; hint?: string
 
 function StatusBadge({ ok, okText, badText }: { ok: boolean; okText?: string; badText?: string }) {
   return <Badge variant="outline" className={`text-[9px] ${ok ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-300" : "border-red-400/40 bg-red-400/10 text-red-300"}`}>{ok ? (okText ?? "✓") : (badText ?? "✗")}</Badge>;
+}
+
+function RenderEmptyOrError({
+  data,
+  error,
+  noneText,
+  lang = "fa",
+  className = "py-6 text-center text-xs text-muted-foreground",
+}: {
+  data?: any;
+  error?: string | null;
+  noneText?: string;
+  lang?: Lang;
+  className?: string;
+}) {
+  const arr = asArr(data);
+  const errStr = error || arr.error || (data && typeof data === "object" && !Array.isArray(data) ? (data.error || data.message) : null);
+  const fallbackNone = lang === "fa" ? "اطلاعاتی در دسترس نیست" : "No data available";
+  const label = noneText && noneText !== "—" && noneText !== "موردی نیست" ? noneText : fallbackNone;
+
+  if (errStr) {
+    return (
+      <div className="my-2 rounded border border-amber-400/30 bg-amber-400/10 p-3 text-center text-xs text-amber-300">
+        <div className="flex items-center justify-center gap-1.5 font-bold">
+          <AlertTriangle className="size-4 text-amber-400" />
+          <span>{lang === "fa" ? "اطلاعاتی در دسترس نیست (خطا در سرویس)" : "No data available (Endpoint Error)"}</span>
+        </div>
+        <p className="mt-1 terminal-font text-[10px] text-amber-200/80" dir="ltr">
+          {String(errStr)}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <p className={className}>
+      {label}
+    </p>
+  );
+}
+
+function TableEmptyOrError({
+  colSpan,
+  data,
+  error,
+  noneText,
+  lang = "fa",
+}: {
+  colSpan: number;
+  data?: any;
+  error?: string | null;
+  noneText?: string;
+  lang?: Lang;
+}) {
+  const arr = asArr(data);
+  const errStr = error || arr.error || (data && typeof data === "object" && !Array.isArray(data) ? (data.error || data.message) : null);
+  const fallbackNone = lang === "fa" ? "اطلاعاتی در دسترس نیست" : "No data available";
+  const label = noneText && noneText !== "—" && noneText !== "موردی نیست" ? noneText : fallbackNone;
+
+  return (
+    <TableRow>
+      <TableCell colSpan={colSpan} className="py-6 text-center text-xs text-muted-foreground">
+        {errStr ? (
+          <div className="my-1 inline-flex flex-col items-center rounded border border-amber-400/30 bg-amber-400/10 px-4 py-2 text-amber-300">
+            <span className="flex items-center gap-1.5 font-bold">
+              <AlertTriangle className="size-3.5 text-amber-400" />
+              {lang === "fa" ? "اطلاعاتی در دسترس نیست" : "No data available"}
+            </span>
+            <span className="mt-0.5 terminal-font text-[10px] text-amber-200/80" dir="ltr">
+              {String(errStr)}
+            </span>
+          </div>
+        ) : (
+          label
+        )}
+      </TableCell>
+    </TableRow>
+  );
 }
 
 /* ─── strings (fa / en) ─────────────────────────────────────────────────── */

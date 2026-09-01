@@ -17,6 +17,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { joinApi } from "@/lib/backend";
 import { getFunctionName } from "convex/server";
+import { logApiError } from "@/lib/api-error-logger";
 
 // ─── auth token ──────────────────────────────────────────────────────────────
 export function readAuthToken(): string {
@@ -61,13 +62,31 @@ async function restCall<T = any>(
       signal: controller.signal,
     });
   } catch (e: any) {
-    throw new Error(e?.name === "AbortError" ? "سرور پاسخ نداد." : String(e?.message ?? e));
+    const errMsg = e?.name === "AbortError" ? "سرور پاسخ نداد." : String(e?.message ?? e);
+    logApiError({
+      endpoint: pathWithQuery,
+      method,
+      statusCode: 0,
+      responseData: null,
+      error: errMsg,
+    });
+    const err = new Error(errMsg) as any;
+    err.endpoint = pathWithQuery;
+    err.method = method;
+    err.status = 0;
+    throw err;
   } finally {
     window.clearTimeout(timer);
   }
   let data: any = {};
   try { data = await res.json(); } catch { /* empty */ }
   if (!res.ok) {
+    logApiError({
+      endpoint: pathWithQuery,
+      method,
+      statusCode: res.status,
+      responseData: data,
+    });
     if (res.status === 401) clearSessionAndGoLogin();
     const statusMap: Record<number, string> = {
       400: "اطلاعات یا درخواست ورودی نامعتبر است (400)",
@@ -86,6 +105,9 @@ async function restCall<T = any>(
     const msg = (rawMsg && typeof rawMsg === "string" && rawMsg.trim()) ? rawMsg.trim() : fallback;
     const err = new Error(msg) as any;
     err.status = res.status;
+    err.endpoint = pathWithQuery;
+    err.method = method;
+    err.responseData = data;
     throw err;
   }
   return data as T;
@@ -419,7 +441,8 @@ async function loadEntry(key: string, name: string, args: any, force = false): P
       entry.data = aliasIds(pickResult(spec, data, args));
       entry.error = undefined;
     } catch (e: any) {
-      entry.error = e instanceof Error ? e : new Error(String(e));
+      const errObj = e instanceof Error ? e : new Error(String(e));
+      entry.error = errObj;
       // A refresh failure KEEPS the previous data; only a first-ever load
       // degrades to the empty shape for the route ([] / {} / null).
       if (!prior || !prior.resolved) {
@@ -427,7 +450,13 @@ async function loadEntry(key: string, name: string, args: any, force = false): P
         const empty = (typeof spec !== "string" && spec.pick)
           ? pickResult(spec, {}, args)
           : (typeof spec !== "string" && spec.list ? [] : null);
-        entry.data = aliasIds(empty);
+        const aliased = aliasIds(empty);
+        if (aliased != null && typeof aliased === "object") {
+          try { (aliased as any).error = errObj.message; } catch { /* noop */ }
+        }
+        entry.data = aliased;
+      } else if (entry.data != null && typeof entry.data === "object") {
+        try { (entry.data as any).error = errObj.message; } catch { /* noop */ }
       }
     } finally {
       entry.loading = false;

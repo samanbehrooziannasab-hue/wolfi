@@ -85,25 +85,23 @@ async function geminiGenerate(
   messages: AIMessage[],
   image?: string,
 ): Promise<string> {
-  // Normalize model aliases to supported current Gemini models (gemini-2.5-flash, gemini-3.6-flash, etc.)
+  // Normalize model aliases to supported current Gemini models
   let raw = (model || "").replace(/^models\//, "").trim();
   let cleanModel = "gemini-2.5-flash";
 
-  if (raw.includes("3.6") || raw.includes("3.1") || raw.includes("flash") || raw.includes("2.5")) {
-    cleanModel = "gemini-2.5-flash";
-  } else if (raw && !raw.includes("2.0") && !raw.includes("1.5") && !raw.includes("pro")) {
+  if (raw && !raw.includes("flash-latest") && !raw.includes("pro-latest")) {
     cleanModel = raw;
   }
 
-  const candidateModels = [
+  const candidateModels = Array.from(new Set([
     cleanModel,
     "gemini-2.5-flash",
-    "gemini-3.6-flash",
-  ];
-  const modelsToTry = Array.from(new Set(candidateModels));
+    "gemini-1.5-flash",
+    "gemini-2.0-flash",
+  ]));
 
   let lastError: any = null;
-  for (const mName of modelsToTry) {
+  for (const mName of candidateModels) {
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(mName)}:generateContent`;
       const systemText = messages
@@ -138,6 +136,19 @@ async function geminiGenerate(
       if (!res.ok) {
         const msg = data?.error?.message ?? `HTTP ${res.status}`;
         lastError = new Error(`Gemini (${mName}): ${msg}`);
+        const lowMsg = msg.toLowerCase();
+        // Quota / rate limit / invalid key errors affect all models on this key — fail fast without redundant model retries
+        if (
+          res.status === 429 ||
+          res.status === 401 ||
+          res.status === 402 ||
+          lowMsg.includes("quota") ||
+          lowMsg.includes("exceeded") ||
+          lowMsg.includes("resource_exhausted") ||
+          lowMsg.includes("key")
+        ) {
+          throw lastError;
+        }
         continue;
       }
       const text = data?.candidates?.[0]?.content?.parts
@@ -150,6 +161,10 @@ async function geminiGenerate(
       return text;
     } catch (err: any) {
       lastError = err;
+      const emsg = String(err?.message ?? "").toLowerCase();
+      if (emsg.includes("quota") || emsg.includes("exceeded") || emsg.includes("resource_exhausted") || emsg.includes("429")) {
+        throw err;
+      }
       continue;
     }
   }
@@ -305,74 +320,79 @@ export const aiGenerate = internalAction({
     image: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const messages: AIMessage[] = [
-      ...(args.system ? [{ role: "system" as const, content: args.system }] : []),
-      { role: "user", content: args.prompt },
-    ];
-    // Vision: only accept real base64 data URLs, capped at ~5 MB.
-    const image = args.image && args.image.startsWith("data:image/")
-      ? args.image.slice(0, 7_000_000)
-      : undefined;
-    const provider = args.provider || "gemini";
-    // Masked/placeholder keys („AIza••••…wxyz“, „sk-****abcd“) are treated as
-    // unset so the env-var fallback is used and we never send a garbage or
-    // non-ASCII key to a provider (reported: “Incorrect API key AQ.Ab8RN****…”).
-    let key = cleanSecretKey(args.key);
-    const def = AI_PROVIDERS.find((p) => p.id === provider);
-    const envKey = def?.envKey ? String(process.env[def.envKey] ?? "") : "";
-    // Env values get the same masking guard — a masked env placeholder must
-    // never be sent to a provider either.
-    if (envKey) key = cleanSecretKey(envKey) || key;
-    // Keyless providers never require a key.
-    if (!KEYLESS_PROVIDER_IDS.has(provider) && !key) {
-      throw new Error(
-        "AI_KEY_NOT_SET — کلید هوش مصنوعی معتبری در تنظیمات ثبت نشده است (یا فقط نسخه‌ی mask شده‌ی آن ذخیره شده). از پنل مدیر یک کلید واقعی وارد کنید.",
-      );
+    try {
+      const messages: AIMessage[] = [
+        ...(args.system ? [{ role: "system" as const, content: args.system }] : []),
+        { role: "user", content: args.prompt },
+      ];
+      // Vision: only accept real base64 data URLs, capped at ~5 MB.
+      const image = args.image && args.image.startsWith("data:image/")
+        ? args.image.slice(0, 7_000_000)
+        : undefined;
+      const provider = args.provider || "gemini";
+      // Masked/placeholder keys („AIza••••…wxyz“, „sk-****abcd“) are treated as
+      // unset so the env-var fallback is used and we never send a garbage or
+      // non-ASCII key to a provider (reported: “Incorrect API key AQ.Ab8RN****…”).
+      let key = cleanSecretKey(args.key);
+      const def = AI_PROVIDERS.find((p) => p.id === provider);
+      const envKey = def?.envKey ? String(process.env[def.envKey] ?? "") : "";
+      // Env values get the same masking guard — a masked env placeholder must
+      // never be sent to a provider either.
+      if (envKey) key = cleanSecretKey(envKey) || key;
+      // Keyless providers never require a key.
+      if (!KEYLESS_PROVIDER_IDS.has(provider) && !key) {
+        throw new Error(
+          "AI_KEY_NOT_SET — کلید هوش مصنوعی معتبری در تنظیمات ثبت نشده است (یا فقط نسخه‌ی mask شده‌ی آن ذخیره شده). از پنل مدیر یک کلید واقعی وارد کنید.",
+        );
+      }
+      const model = args.model || AI_PROVIDER_MODELS[provider] || "gpt-4o-mini";
+      let text: string;
+      if (provider === "pollinations") {
+        text = await pollinationsGenerate(model, messages, image);
+      } else if (provider === "gemini") {
+        text = await geminiGenerate(model, key, messages, image);
+      } else if (provider === "anthropic") {
+        text = await anthropicGenerate(model, key, messages, image);
+      } else if (provider === "freeoneapi") {
+        // Self-hosted free-one-api gateway (OpenAI-compatible). Base URL comes
+        // from the FREE_ONE_API_BASE env var (defaults to the localhost Docker
+        // default of the project).
+        const base = String(process.env.FREE_ONE_API_BASE ?? "").trim() || "http://127.0.0.1:3000/v1";
+        text = await openAiCompose(base, model, key, messages);
+      } else if (def?.baseEnv) {
+        // Self-hosted OpenAI-compatible gateways (kiro-gateway, nanobot, apfel,
+        // WebAI-to-API). Base URL from the env override, else the registry
+        // default; key optional — when absent, call without Authorization.
+        const base =
+          String(process.env[def.baseEnv] ?? "").trim().replace(/\/+$/, "") ||
+          def.base ||
+          "http://127.0.0.1:8000/v1";
+        text = key
+          ? await openAiCompose(base, model, key, messages, image)
+          : await openAiKeylessGenerate(base, model, messages, image);
+      } else if (def?.kind === "keyless") {
+        // Keyless OpenAI-compatible tier (llm7, kilo, ovhcloud…): no
+        // Authorization header at all.
+        text = await openAiKeylessGenerate(def.base ?? "https://api.openai.com/v1", model, messages, image);
+      } else {
+        // Generic OpenAI-compatible keyed provider (openai, openrouter, groq,
+        // cerebras, mistral, nvidia, deepseek, xai, hf, githubmodels, anyapi…).
+        text = await openAiCompose(def?.base ?? "https://api.openai.com/v1", model, key, messages, image);
+      }
+      if (args.analysisKey) {
+        await ctx.runMutation(internal.engineWorker.storeAiReview, {
+          key: args.analysisKey,
+          symbol: args.analysisSymbol,
+          provider,
+          model: args.model,
+          text,
+        });
+      }
+      return { ok: true, text };
+    } catch (e: any) {
+      const error = e?.message ?? String(e);
+      return { ok: false, error };
     }
-    const model = args.model || AI_PROVIDER_MODELS[provider] || "gpt-4o-mini";
-    let text: string;
-    if (provider === "pollinations") {
-      text = await pollinationsGenerate(model, messages, image);
-    } else if (provider === "gemini") {
-      text = await geminiGenerate(model, key, messages, image);
-    } else if (provider === "anthropic") {
-      text = await anthropicGenerate(model, key, messages, image);
-    } else if (provider === "freeoneapi") {
-      // Self-hosted free-one-api gateway (OpenAI-compatible). Base URL comes
-      // from the FREE_ONE_API_BASE env var (defaults to the localhost Docker
-      // default of the project).
-      const base = String(process.env.FREE_ONE_API_BASE ?? "").trim() || "http://127.0.0.1:3000/v1";
-      text = await openAiCompose(base, model, key, messages);
-    } else if (def?.baseEnv) {
-      // Self-hosted OpenAI-compatible gateways (kiro-gateway, nanobot, apfel,
-      // WebAI-to-API). Base URL from the env override, else the registry
-      // default; key optional — when absent, call without Authorization.
-      const base =
-        String(process.env[def.baseEnv] ?? "").trim().replace(/\/+$/, "") ||
-        def.base ||
-        "http://127.0.0.1:8000/v1";
-      text = key
-        ? await openAiCompose(base, model, key, messages, image)
-        : await openAiKeylessGenerate(base, model, messages, image);
-    } else if (def?.kind === "keyless") {
-      // Keyless OpenAI-compatible tier (llm7, kilo, ovhcloud…): no
-      // Authorization header at all.
-      text = await openAiKeylessGenerate(def.base ?? "https://api.openai.com/v1", model, messages, image);
-    } else {
-      // Generic OpenAI-compatible keyed provider (openai, openrouter, groq,
-      // cerebras, mistral, nvidia, deepseek, xai, hf, githubmodels, anyapi…).
-      text = await openAiCompose(def?.base ?? "https://api.openai.com/v1", model, key, messages, image);
-    }
-    if (args.analysisKey) {
-      await ctx.runMutation(internal.engineWorker.storeAiReview, {
-        key: args.analysisKey,
-        symbol: args.analysisSymbol,
-        provider,
-        model: args.model,
-        text,
-      });
-    }
-    return { ok: true, text };
   },
 });
 

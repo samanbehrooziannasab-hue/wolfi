@@ -300,12 +300,17 @@ const schema = defineSchema({
     sentEnAt: v.optional(v.number()), // manually posted to the English channel
     created: v.number(),
     expires: v.number(),
-  }).index("status", ["status"]),
+  })
+    .index("status", ["status"])
+    .index("by_symbol", ["symbol"])
+    .index("by_created", ["created"]),
 
   // ─── positions ────────────────────────────────────────────────────────
   open_positions: defineTable({
     ...positionFields,
-  }).index("symbol", ["symbol"]),
+  })
+    .index("symbol", ["symbol"])
+    .index("by_mode", ["mode"]),
 
   closed_positions: defineTable({
     ...positionFields,
@@ -314,7 +319,9 @@ const schema = defineSchema({
     closeReason: v.string(), // take_profit | stop_loss | manual | reanalysis | exchange
     profit: v.number(),
     error: v.optional(v.string()),
-  }).index("by_time", ["closeTime"]),
+  })
+    .index("by_time", ["closeTime"])
+    .index("by_symbol", ["symbol"]),
 
   orders: defineTable({
     exchange: v.string(),
@@ -409,7 +416,9 @@ const schema = defineSchema({
     seenAt: v.optional(v.number()),
     tgSent: v.optional(v.boolean()),
     created: v.number(),
-  }),
+  })
+    .index("by_user", ["userId"])
+    .index("by_created", ["created"]),
 
   telegram_messages: defineTable({
     chatId: v.string(),

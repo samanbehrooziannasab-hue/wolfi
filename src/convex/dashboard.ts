@@ -15,13 +15,13 @@ export const overview = query({
     // falls back to DEFAULT_SETTINGS for keys that were never seeded.
     const [openPositions, closedPositions, signals, markets, strategies, settings, lessons] =
       await Promise.all([
-        ctx.db.query("open_positions").collect(),
-        ctx.db.query("closed_positions").order("desc").take(60),
-        ctx.db.query("signals").take(100),
-        ctx.db.query("markets").collect(),
-        ctx.db.query("strategies").collect(),
-        getSettingsMap(ctx),
-        ctx.db.query("learningHistory").order("desc").take(12),
+        ctx.db.query("open_positions").collect().catch(() => []),
+        ctx.db.query("closed_positions").order("desc").take(60).catch(() => []),
+        ctx.db.query("signals").take(100).catch(() => []),
+        ctx.db.query("markets").collect().catch(() => []),
+        ctx.db.query("strategies").collect().catch(() => []),
+        getSettingsMap(ctx).catch(() => ({}) as Record<string, any>),
+        ctx.db.query("learningHistory").order("desc").take(12).catch(() => []),
       ]);
 
     const marketsEnabled = markets.filter((m) => m.enabled).length;

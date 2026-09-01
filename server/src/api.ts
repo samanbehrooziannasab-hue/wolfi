@@ -42,13 +42,58 @@ import { swapwalletBase, prices as swapPrices, balances as swapBalances, transac
 
 export const app = new Hono();
 
-app.onError((error, c) => {
-  const message = String((error as any)?.message ?? "خطای داخلی سرور");
-  if (["close_price_equals_entry", "invalid_close_price", "invalid_position_values", "invalid_entry_price", "invalid_position_size", "invalid_exit_levels", "exit_level_equals_entry", "exit_levels_wrong_side"].includes(message)) {
-    return c.json({ error: message === "close_price_equals_entry" ? "قیمت خروج با قیمت ورود برابر است و پوزیشن بسته نشد." : "مقادیر قیمت پوزیشن معتبر نیستند." }, 400);
+// Global HTTP status & failure monitoring middleware
+app.use("*", async (c, next) => {
+  const method = c.req.method;
+  const path = c.req.path;
+  const startTime = Date.now();
+  await next();
+  const durationMs = Date.now() - startTime;
+  const status = c.res.status;
+
+  if (status >= 500) {
+    const errorMsg = `[API 500 ERROR] Endpoint Failed: ${method} ${path} | Status Code: ${status} | Duration: ${durationMs}ms`;
+    console.error(errorMsg);
+    void logEngine("ERROR", errorMsg, { method, path, status, durationMs }, "api").catch(() => {});
+  } else if (status >= 400) {
+    console.warn(`[API WARN] Endpoint: ${method} ${path} | Status Code: ${status} | Duration: ${durationMs}ms`);
   }
-  console.error("[api] unhandled error", error);
-  return c.json({ error: "خطای داخلی سرور" }, 500);
+});
+
+app.onError((error, c) => {
+  const method = c.req.method;
+  const path = c.req.path;
+  const message = String((error as any)?.message ?? "خطای داخلی سرور");
+  const stack = (error as any)?.stack;
+
+  if (["close_price_equals_entry", "invalid_close_price", "invalid_position_values", "invalid_entry_price", "invalid_position_size", "invalid_exit_levels", "exit_level_equals_entry", "exit_levels_wrong_side"].includes(message)) {
+    console.warn(`[API 400 BAD REQUEST] Endpoint: ${method} ${path} | Reason: ${message}`);
+    return c.json({
+      error: message === "close_price_equals_entry" ? "قیمت خروج با قیمت ورود برابر است و پوزیشن بسته نشد." : "مقادیر قیمت پوزیشن معتبر نیستند.",
+      endpoint: path,
+      method,
+      status: 400,
+    }, 400);
+  }
+
+  const logMessage = `[API 500 EXCEPTION] Endpoint Failed: ${method} ${path} | Status Code: 500 | Error: ${message}`;
+  console.error(logMessage, {
+    endpoint: path,
+    method,
+    status: 500,
+    error: message,
+    stack,
+  });
+
+  void logEngine("ERROR", logMessage, { method, path, message, stack }, "api").catch(() => {});
+
+  return c.json({
+    error: "خطای داخلی سرور (500)",
+    endpoint: path,
+    method,
+    status: 500,
+    detail: process.env.NODE_ENV !== "production" ? message : undefined,
+  }, 500);
 });
 
 app.use("*", cors({ origin: config.corsOrigins, credentials: true }));
@@ -3212,7 +3257,12 @@ export function startServer(): void {
 // `node server/dist/api.js`), bind the HTTP + WebSocket server on boot.
 // Guarded so importing api.ts from tests/tools does not open a port.
 // ─────────────────────────────────────────────────────────────────────────────
-const _isEntry = config.role === "api" || (typeof process.argv[1] === "string" && process.argv[1].includes("api.js"));
+const _isEntry =
+  config.role === "api" ||
+  (typeof process.argv[1] === "string" &&
+    (process.argv[1].endsWith("api.js") ||
+      process.argv[1].endsWith("api.ts") ||
+      process.argv[1].includes("api")));
 if (_isEntry) {
   startServer();
 }

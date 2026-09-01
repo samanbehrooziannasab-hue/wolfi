@@ -10,6 +10,8 @@
 // This file is the single seam: everything backend-specific branches on
 // `BACKEND`. It never changes at runtime (import.meta.env is baked at build).
 // ---------------------------------------------------------------------------
+import { logApiError } from "@/lib/api-error-logger";
+
 export type Backend = "convex" | "rest";
 
 export const BACKEND: Backend =
@@ -63,14 +65,35 @@ export async function restFetch<T = any>(
       window.clearTimeout(timer);
     }
   } catch (e: any) {
+    const method = opts.method ?? "GET";
     // AbortController → "AbortError"; translate to a clear Persian-friendly error.
     if (e?.name === "AbortError" || String(e?.message ?? "").includes("aborted")) {
+      logApiError({
+        endpoint: path,
+        method,
+        statusCode: 0,
+        responseData: null,
+        error: "سرور پاسخ نداد (Timeout)",
+      });
       const err = new Error("سرور پاسخ نداد. دوباره تلاش کنید.") as any;
       err.status = 0;
+      err.endpoint = path;
+      err.method = method;
       err.timeout = true;
       throw err;
     }
-    throw new Error(String(e?.message ?? "network_error"));
+    logApiError({
+      endpoint: path,
+      method,
+      statusCode: 0,
+      responseData: null,
+      error: e,
+    });
+    const err = new Error(String(e?.message ?? "network_error")) as any;
+    err.endpoint = path;
+    err.method = method;
+    err.status = 0;
+    throw err;
   }
   let data: any = {};
   try {
@@ -79,8 +102,18 @@ export async function restFetch<T = any>(
     // empty body — fine for 204-style responses
   }
   if (!res.ok) {
+    const method = opts.method ?? "GET";
+    logApiError({
+      endpoint: path,
+      method,
+      statusCode: res.status,
+      responseData: data,
+    });
     const err = new Error(String(data?.error ?? data?.message ?? `http_${res.status}`)) as any;
     err.status = res.status;
+    err.endpoint = path;
+    err.method = method;
+    err.data = data;
     throw err;
   }
   return data as T;

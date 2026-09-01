@@ -21,6 +21,10 @@ export const pool = new Pool({
       : undefined,
 });
 
+pool.on("error", (err) => {
+  console.error("[db pool error]", err.message);
+});
+
 export type Row = Record<string, any>;
 export type Rows = Row[];
 

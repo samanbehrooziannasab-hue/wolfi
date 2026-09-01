@@ -237,7 +237,34 @@ export async function aiAsk(
       await logEngine("WARNING", `ai ${p.provider} failed: ${e.message}`, null, "ai");
     }
   }
-  await logEngine("ERROR", `ai gateway exhausted: ${lastErr}`, { purpose }, "ai");
+  await logEngine("ERROR", `ai gateway exhausted: ${lastErr}, attempting keyless fallback`, { purpose }, "ai");
+  try {
+    const res = await fetch("https://text.pollinations.ai/openai", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        model: "mistral",
+        messages: [
+          ...(system ? [{ role: "system", content: system }] : []),
+          { role: "user", content: user },
+        ],
+        temperature: 0.4,
+        max_tokens: 1200,
+      }),
+      signal: AbortSignal.timeout(20000),
+    });
+    if (res.ok) {
+      const j = (await res.json()) as any;
+      const text = String(j?.choices?.[0]?.message?.content ?? "").trim();
+      if (text) {
+        const out = { text, provider: "pollinations", model: "mistral" };
+        if (ck && opts.cacheTtlSec) await cacheSet(`ai:${ck}`, out, opts.cacheTtlSec);
+        return out;
+      }
+    }
+  } catch (e: any) {
+    await logEngine("WARNING", `keyless fallback failed: ${e.message}`, null, "ai");
+  }
   return null;
 }
 
