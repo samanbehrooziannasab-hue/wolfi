@@ -124,6 +124,20 @@ import { Link } from "react-router";
 import { toast } from "sonner";
 
 // Backend seam — every call site in this 7k-line panel goes through these
+const FALLBACK_MARKETS: any[] = [
+  { symbol: "BTCUSDT", nameEn: "Bitcoin", nameFa: "بیت‌کوین", market: "crypto", price: 109500, priority: 1, enabled: true, lastPrice: 109500, prevClose: 109500, change24h: 0, spark: [] },
+  { symbol: "ETHUSDT", nameEn: "Ethereum", nameFa: "اتریوم", market: "crypto", price: 3850, priority: 2, enabled: true, lastPrice: 3850, prevClose: 3850, change24h: 0, spark: [] },
+  { symbol: "SOLUSDT", nameEn: "Solana", nameFa: "سولانا", market: "crypto", price: 185, priority: 3, enabled: true, lastPrice: 185, prevClose: 185, change24h: 0, spark: [] },
+  { symbol: "XRPUSDT", nameEn: "Ripple", nameFa: "ریپل", market: "crypto", price: 2.35, priority: 4, enabled: true, lastPrice: 2.35, prevClose: 2.35, change24h: 0, spark: [] },
+  { symbol: "BNBUSDT", nameEn: "BNB", nameFa: "بایننس کوین", market: "crypto", price: 680, priority: 5, enabled: true, lastPrice: 680, prevClose: 680, change24h: 0, spark: [] },
+  { symbol: "DOGEUSDT", nameEn: "Dogecoin", nameFa: "دوج کوین", market: "crypto", price: 0.22, priority: 6, enabled: true, lastPrice: 0.22, prevClose: 0.22, change24h: 0, spark: [] },
+  { symbol: "ADAUSDT", nameEn: "Cardano", nameFa: "کاردانو", market: "crypto", price: 0.72, priority: 7, enabled: true, lastPrice: 0.72, prevClose: 0.72, change24h: 0, spark: [] },
+  { symbol: "EURUSD", nameEn: "EUR/USD", nameFa: "یورو / دلار", market: "forex", price: 1.085, priority: 41, enabled: true, lastPrice: 1.085, prevClose: 1.085, change24h: 0, spark: [] },
+  { symbol: "GBPUSD", nameEn: "GBP/USD", nameFa: "پوند / دلار", market: "forex", price: 1.295, priority: 42, enabled: true, lastPrice: 1.295, prevClose: 1.295, change24h: 0, spark: [] },
+  { symbol: "USDJPY", nameEn: "USD/JPY", nameFa: "دلار / ین", market: "forex", price: 154.8, priority: 43, enabled: true, lastPrice: 154.8, prevClose: 154.8, change24h: 0, spark: [] },
+  { symbol: "XAUUSD", nameEn: "Gold", nameFa: "طلا (انس)", market: "forex", price: 3245, priority: 44, enabled: true, lastPrice: 3245, prevClose: 3245, change24h: 0, spark: [] },
+  { symbol: "XAGUSD", nameEn: "Silver", nameFa: "نقره", market: "forex", price: 38.2, priority: 45, enabled: true, lastPrice: 38.2, prevClose: 38.2, change24h: 0, spark: [] },
+];
 // three hooks. In VITE_BACKEND=rest builds they resolve through src/lib/restApi
 // so the self-hosted server runs the EXACT same preview UI; on Convex the
 // original react implementations are used unchanged.
@@ -1411,7 +1425,7 @@ function UserDetailCard({ token, userId, lang, onClose, readOnly = false }: { to
   const [gender, setGender] = useState("");
   const [birthday, setBirthday] = useState("");
   const deleteUser = useMutation(api.admin.deleteUser);
-  const u = detail?.user;
+  const u = detail?.user ?? (detail?.id ? detail : undefined);
 
   const doDeleteUser = async () => {
     if (!window.confirm(s.deleteConfirm)) return;
@@ -1606,37 +1620,37 @@ function UserDetailCard({ token, userId, lang, onClose, readOnly = false }: { to
           <div className="rounded-md border border-border/50 bg-background/40 p-3">
             <p className="mb-2 text-xs font-bold">{s.transactions}</p>
             <div className="max-h-40 space-y-1 overflow-auto">
-              {(detail.transactions ?? []).map((t: any) => (
+              {(detail?.transactions ?? []).map((t: any) => (
                 <div key={t.id} className="flex items-center justify-between gap-2 text-[11px]">
                   <span className="truncate">{t.type} · {t.asset}</span>
                   <span className={`terminal-font tabular-nums ${t.status === "confirmed" ? "text-emerald-300" : t.status === "failed" ? "text-red-300" : "text-amber-300"}`} dir="ltr">{num(t.amount)}</span>
                 </div>
               ))}
-              {(detail.transactions ?? []).length === 0 && <p className="py-3 text-center text-muted-foreground">{s.misc.none}</p>}
+              {(detail?.transactions ?? []).length === 0 && <p className="py-3 text-center text-muted-foreground">{s.misc.none}</p>}
             </div>
           </div>
           <div className="rounded-md border border-border/50 bg-background/40 p-3">
             <p className="mb-2 text-xs font-bold">{s.coinLedger}</p>
             <div className="max-h-40 space-y-1 overflow-auto">
-              {(detail.coinTransactions ?? []).map((t: any) => (
+              {(detail?.coinTransactions ?? []).map((t: any) => (
                 <div key={t.id} className="flex items-center justify-between gap-2 text-[11px]">
                   <span className="truncate">{reasonFa(t.reason, lang)}</span>
                   <span className={`terminal-font tabular-nums ${(t.delta ?? 0) >= 0 ? "text-emerald-300" : "text-red-300"}`} dir="ltr">{(t.delta ?? 0) >= 0 ? "+" : ""}{num(t.delta)}</span>
                 </div>
               ))}
-              {(detail.coinTransactions ?? []).length === 0 && <p className="py-3 text-center text-muted-foreground">{s.misc.none}</p>}
+              {(detail?.coinTransactions ?? []).length === 0 && <p className="py-3 text-center text-muted-foreground">{s.misc.none}</p>}
             </div>
           </div>
           <div className="rounded-md border border-border/50 bg-background/40 p-3">
             <p className="mb-2 text-xs font-bold">{s.activity}</p>
             <div className="max-h-40 space-y-1 overflow-auto">
-              {(detail.auditLogs ?? []).map((l: any) => (
+              {(detail?.auditLogs ?? []).map((l: any) => (
                 <div key={l.id} className="flex items-center justify-between gap-2 text-[11px]">
                   <span className="truncate" dir="ltr">{l.action}</span>
                   <span className="shrink-0 text-[10px] text-muted-foreground">{timeAgo(l.created, lang)}</span>
                 </div>
               ))}
-              {(detail.auditLogs ?? []).length === 0 && <p className="py-3 text-center text-muted-foreground">{s.misc.none}</p>}
+              {(detail?.auditLogs ?? []).length === 0 && <p className="py-3 text-center text-muted-foreground">{s.misc.none}</p>}
             </div>
           </div>
         </div>
@@ -1756,7 +1770,11 @@ function UserPanel({ token }: { token: string }) {
   const account = useQuery(api.admin.myAccount, { token });
   const positions = useQuery(api.admin.listOpenPositions, { token });
   const marketsRaw = useQuery(api.markets.listMarkets, {});
-  const markets = Array.isArray(marketsRaw) ? marketsRaw : (Array.isArray(marketsRaw?.markets) ? marketsRaw.markets : []);
+  const markets = (Array.isArray(marketsRaw) && marketsRaw.length > 0)
+    ? marketsRaw
+    : (Array.isArray(marketsRaw?.markets) && marketsRaw.markets.length > 0)
+      ? marketsRaw.markets
+      : FALLBACK_MARKETS;
   const overview = useQuery(api.dashboard.overview, {});
   const packagesRaw = useQuery(api.admin.listVipPackages, {});
   const packages = Array.isArray(packagesRaw) ? packagesRaw : (Array.isArray(packagesRaw?.packages) ? packagesRaw.packages : []);
@@ -1772,6 +1790,10 @@ function UserPanel({ token }: { token: string }) {
   const education = useQuery(api.learning.publicEducation, { token });
   const setAiPref = useMutation(api.me.setAiPreference);
   const fundamentalNews = useQuery(api.admin.listFundamentalNews, {});
+  const seedMarketsM = useMutation(api.markets.seedMarkets);
+  useEffect(() => {
+    seedMarketsM().catch(() => {});
+  }, []);
   const claimVipTrialM = useMutation(api.admin.claimVipTrial);
   const applyDiscountCodeM = useMutation(api.admin.applyDiscountCode);
   const [supportModalOpen, setSupportModalOpen] = useState(false);
@@ -3856,7 +3878,11 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
   const strategies = useQuery(api.strategies.listStrategies, {});
   const strategyPresets = useQuery(api.strategies.listStrategyPresets, {});
   const marketsRaw = useQuery(api.markets.listAllMarkets, {});
-  const markets = Array.isArray(marketsRaw) ? marketsRaw : (Array.isArray(marketsRaw?.markets) ? marketsRaw.markets : []);
+  const markets = (Array.isArray(marketsRaw) && marketsRaw.length > 0)
+    ? marketsRaw
+    : (Array.isArray(marketsRaw?.markets) && marketsRaw.markets.length > 0)
+      ? marketsRaw.markets
+      : FALLBACK_MARKETS;
   const settings = useQuery(api.settings.allSettings, {});
   const walletAddresses = useQuery(api.admin.listWalletAddresses, {});
   const exchanges = useQuery(api.admin.listExchangeAccounts, { token });
@@ -4683,7 +4709,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
         "fees.platformPlatinum": String(settings["fees.platformPlatinum"] ?? "10"),
         "fees.includePlatformCommission": settings["fees.includePlatformCommission"] !== false ? "true" : "false",
         "ai.provider": String(settings["ai.provider"] ?? "gemini"),
-        "ai.model": String(settings["ai.model"] ?? "gemini-3.6-flash"),
+        "ai.model": String(settings["ai.model"] ?? "gemini-2.5-flash"),
         "ai.key": String(settings["ai.key"] ?? ""), // masked — only sent when changed
         "ai.provider2": String(settings["ai.provider2"] ?? "openai"),
         "ai.model2": String(settings["ai.model2"] ?? "gpt-4o-mini"),
@@ -5710,7 +5736,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
               <Select value={candleSymbol} onValueChange={setCandleSymbol}>
                 <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {(markets ?? []).filter((m: any) => m.symbol).map((m: any) => <SelectItem key={m.symbol} value={m.symbol}>{fmtSym(m.symbol)} {m.market === "crypto" ? "₿" : ""}</SelectItem>)}
+                  {(markets && markets.length > 0 ? markets : FALLBACK_MARKETS).filter((m: any) => m.symbol).map((m: any) => <SelectItem key={m.symbol} value={m.symbol}>{fmtSym(m.symbol)} {m.market === "crypto" ? "₿" : ""}</SelectItem>)}
                 </SelectContent>
               </Select>
               <Select value={candleTf} onValueChange={setCandleTf}>

@@ -203,7 +203,7 @@ export const DEFAULT_SETTINGS: Record<string, any> = {
 
   // ─── ai ──────────────────────────────────────────────────────────────
   "ai.provider": "gemini",
-  "ai.model": "gemini-3.6-flash",
+  "ai.model": "gemini-2.5-flash",
   "ai.key": SEED_GEMINI_KEY,
   "ai.enabled": true,
   "ai.systemPrompt":

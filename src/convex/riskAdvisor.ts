@@ -23,7 +23,7 @@ export const request = mutation({
 
     const reviewKey = `risk:${admin._id}:${Date.now()}`;
     const provider = String(settings["ai.provider"] ?? "gemini");
-    const model = String(settings["ai.model"] ?? "gemini-3.6-flash");
+    const model = String(settings["ai.model"] ?? "gemini-2.5-flash");
     const key = String(settings["ai.key"] ?? "");
     const freeFallback = !(settings["ai.freeFallback"] === false || settings["ai.freeFallback"] === "false");
     const virtualCapital = Number(settings["risk.virtualCapital"] ?? 1000);

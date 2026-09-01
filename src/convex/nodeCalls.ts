@@ -85,38 +85,20 @@ async function geminiGenerate(
   messages: AIMessage[],
   image?: string,
 ): Promise<string> {
-  // Normalize model aliases to supported current Gemini models (gemini-3.6-flash, gemini-3.6-pro)
-  let cleanModel = model || "gemini-3.6-flash";
-  if (
-    cleanModel === "gemini-1.5-flash" ||
-    cleanModel === "gemini-2.0-flash" ||
-    cleanModel === "gemini-2.5-flash" ||
-    cleanModel === "gemini-flash" ||
-    cleanModel === "gemini-flash-latest" ||
-    cleanModel === "models/gemini-1.5-flash" ||
-    cleanModel === "models/gemini-2.0-flash" ||
-    cleanModel === "models/gemini-2.5-flash" ||
-    cleanModel === "models/gemini-3.6-flash"
-  ) {
-    cleanModel = "gemini-3.6-flash";
-  } else if (
-    cleanModel === "gemini-1.5-pro" ||
-    cleanModel === "gemini-2.0-pro" ||
-    cleanModel === "gemini-2.5-pro" ||
-    cleanModel === "gemini-pro" ||
-    cleanModel === "gemini-pro-latest" ||
-    cleanModel === "models/gemini-1.5-pro" ||
-    cleanModel === "models/gemini-2.0-pro" ||
-    cleanModel === "models/gemini-2.5-pro" ||
-    cleanModel === "models/gemini-3.6-pro"
-  ) {
-    cleanModel = "gemini-3.6-pro";
+  // Normalize model aliases to supported current Gemini models (gemini-2.5-flash, gemini-3.6-flash, etc.)
+  let raw = (model || "").replace(/^models\//, "").trim();
+  let cleanModel = "gemini-2.5-flash";
+
+  if (raw.includes("3.6") || raw.includes("3.1") || raw.includes("flash") || raw.includes("2.5")) {
+    cleanModel = "gemini-2.5-flash";
+  } else if (raw && !raw.includes("2.0") && !raw.includes("1.5") && !raw.includes("pro")) {
+    cleanModel = raw;
   }
 
   const candidateModels = [
     cleanModel,
-    "gemini-3.5-flash",
-    "gemini-3.5-pro",
+    "gemini-2.5-flash",
+    "gemini-3.6-flash",
   ];
   const modelsToTry = Array.from(new Set(candidateModels));
 
@@ -156,57 +138,19 @@ async function geminiGenerate(
       if (!res.ok) {
         const msg = data?.error?.message ?? `HTTP ${res.status}`;
         lastError = new Error(`Gemini (${mName}): ${msg}`);
-        const low = msg.toLowerCase();
-        // If high demand, overloaded, not found, deprecated, no longer available, quota, or temporary error, try next model
-        if (
-          low.includes("high demand") ||
-          low.includes("overloaded") ||
-          low.includes("not found") ||
-          low.includes("not supported") ||
-          low.includes("no longer available") ||
-          low.includes("deprecated") ||
-          low.includes("update your code") ||
-          low.includes("exhausted") ||
-          low.includes("quota") ||
-          low.includes("rate") ||
-          low.includes("limit") ||
-          low.includes("billing") ||
-          low.includes("503") ||
-          low.includes("404") ||
-          low.includes("429")
-        ) {
-          continue;
-        }
-        throw lastError;
+        continue;
       }
       const text = data?.candidates?.[0]?.content?.parts
         ?.map((p: any) => p.text ?? "")
         .join("");
-      if (!text) throw new Error(`Gemini (${mName}): پاسخ خالی`);
+      if (!text) {
+        lastError = new Error(`Gemini (${mName}): پاسخ خالی`);
+        continue;
+      }
       return text;
     } catch (err: any) {
       lastError = err;
-      const errMsg = String(err?.message ?? "").toLowerCase();
-      if (
-        errMsg.includes("high demand") ||
-        errMsg.includes("overloaded") ||
-        errMsg.includes("not found") ||
-        errMsg.includes("not supported") ||
-        errMsg.includes("no longer available") ||
-        errMsg.includes("deprecated") ||
-        errMsg.includes("update your code") ||
-        errMsg.includes("exhausted") ||
-        errMsg.includes("quota") ||
-        errMsg.includes("rate") ||
-        errMsg.includes("limit") ||
-        errMsg.includes("billing") ||
-        errMsg.includes("503") ||
-        errMsg.includes("404") ||
-        errMsg.includes("429")
-      ) {
-        continue;
-      }
-      throw err;
+      continue;
     }
   }
   throw lastError ?? new Error("Gemini: All model fallbacks failed");
@@ -552,7 +496,7 @@ export const aiGenerateRobust = internalAction({
       try {
         const r: any = await ctx.runAction(internal.nodeCalls.aiGenerate, {
           provider: attempt.provider,
-          model: attempt.model || AI_PROVIDER_MODELS[attempt.provider] || "gemini-3.6-flash",
+          model: attempt.model || AI_PROVIDER_MODELS[attempt.provider] || "gemini-2.5-flash",
           system: args.system,
           prompt: args.prompt,
           key: cleanSecretKey(args.key),
@@ -610,7 +554,7 @@ export const aiHealthProbe = internalAction({
       const due = await ctx.runMutation(internal.settings.tickCron, { lastKey: "ai.lastHealthAt", minutes });
       if (!due) return { ok: true, skipped: true };
       const provider = String(settings["ai.provider"] ?? "gemini");
-      const model = String(settings["ai.model"] ?? "gemini-3.6-flash");
+      const model = String(settings["ai.model"] ?? "gemini-2.5-flash");
       const key = String(settings["ai.key"] ?? "");
       const freeFallback = !(settings["ai.freeFallback"] === false || settings["ai.freeFallback"] === "false");
       const started = Date.now();

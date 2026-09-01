@@ -45,7 +45,7 @@ export const askWolfAi = mutation({
     const explicit = userProvider && userProvider !== "auto" ? userProvider : "";
     const wantRandom = explicit === "random";
     const provider = wantRandom || !explicit ? String(settings["ai.provider"] ?? "gemini") : explicit;
-    const model = userModel || String(settings["ai.model"] ?? "gemini-3.6-flash");
+    const model = userModel || String(settings["ai.model"] ?? "gemini-2.5-flash");
     // Random mode is the default (ai.randomProvider=true): the actual provider
     // that answered is stored on the result and shown under each reply, so the
     // selection is never fake — it either picks that AI or visibly falls back.
@@ -623,7 +623,7 @@ export const testAi = mutation({
     const admin = await requireAdmin(ctx, token);
     const settings = await getSettingsMap(ctx);
     const provider = String(settings["ai.provider"] ?? "gemini");
-    const model = String(settings["ai.model"] ?? "gemini-3.6-flash");
+    const model = String(settings["ai.model"] ?? "gemini-2.5-flash");
     const aiKey = String(settings["ai.key"] ?? "");
     // Keyless free base (Pollinations) means the test can run with NO key;
     // configured keys are used as supplements by the robust chain.

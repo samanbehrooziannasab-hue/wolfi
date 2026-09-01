@@ -914,7 +914,7 @@ function scheduleTradeNotification(ctx: any, settings: Record<string, any>, posi
 // ── AI learning review (schedule as action) ───────────────────────────────
 function scheduleAiReview(ctx: any, settings: Record<string, any>, c: any, dir: string, stopLoss: number, tp1: number, rr: number): void {
   const provider = settings["ai.provider"] ?? "gemini";
-  const model = settings["ai.model"] ?? "gemini-3.6-flash";
+  const model = settings["ai.model"] ?? "gemini-2.5-flash";
   const key = settings["ai.key"];
   const systemPrompt = settings["ai.systemPrompt"] ?? "";
   const freeFallback = !isFalseSetting(settings["ai.freeFallback"]);
@@ -1511,7 +1511,7 @@ export const runResearch = action({
     const settings = context.settings;
     if (settings["ai.researchEnabled"] === false) throw new Error("ai.researchEnabled is off");
     const provider = settings["ai.provider"] ?? "gemini";
-    const model = settings["ai.model"] ?? "gemini-3.6-flash";
+    const model = settings["ai.model"] ?? "gemini-2.5-flash";
     const key = settings["ai.key"];
     if (!key) throw new Error("AI key not configured");
     const symbols = [...new Set((context.windows ?? []).map((w: any) => w.symbol))].slice(0, 5);
@@ -1780,7 +1780,7 @@ export const runAiBacktest = action({
     const context: any = await ctx.runQuery(internal.engineData.getTunerContext, { token, limit: 4 });
     const settings = context.settings;
     const provider = settings["ai.provider"] ?? "gemini";
-    const model = settings["ai.model"] ?? "gemini-3.6-flash";
+    const model = settings["ai.model"] ?? "gemini-2.5-flash";
     const key = settings["ai.key"];
     if (!key && isFalseSetting(settings["ai.freeFallback"])) {
       throw new Error("هیچ کلید AI و fallback رایگان فعال نیست — کلید بگذارید یا fallback را روشن کنید");

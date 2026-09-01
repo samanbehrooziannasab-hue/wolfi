@@ -88,7 +88,7 @@ export const FREE_AI_CHAIN: ReadonlyArray<{
   model: string;
   envKey: string;
 }> = [
-  { provider: "gemini", model: "gemini-3.6-flash", envKey: "GEMINI_API_KEY" },
+  { provider: "gemini", model: "gemini-2.5-flash", envKey: "GEMINI_API_KEY" },
   { provider: "groq", model: "llama-3.3-70b-versatile", envKey: "GROQ_API_KEY" },
   { provider: "openrouter", model: "meta-llama/llama-3.3-70b-instruct:free", envKey: "OPENROUTER_API_KEY" },
   { provider: "cerebras", model: "llama-3.3-70b", envKey: "CEREBRAS_API_KEY" },

@@ -92,7 +92,10 @@ async function callProvider(
 
   switch (p.provider) {
     case "gemini": {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${p.model}:generateContent?key=${key}`;
+      let mName = (p.model || "gemini-2.5-flash").replace(/^models\//, "");
+      if (mName === "gemini-flash-latest" || mName === "gemini-flash" || mName.includes("3.5") || mName.includes("3.6")) mName = "gemini-2.5-flash";
+      if (mName === "gemini-pro-latest" || mName === "gemini-pro") mName = "gemini-2.5-pro";
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${mName}:generateContent?key=${key}`;
       const res = await fetch(url, {
         method: "POST",
         headers: { "content-type": "application/json" },

@@ -18,7 +18,13 @@ if ! curl -s -m 2 -o /dev/null http://127.0.0.1:3210/ 2>/dev/null && \
   echo "[dev] no Convex backend on :3210 — resetting stale sandbox state..."
   rm -rf .convex/local
   echo "[dev] starting Convex backend..."
-  node ./node_modules/convex/bin/main.js dev --typecheck=disable &
+  if [ -f "./node_modules/convex/bin/main.js" ]; then
+    node ./node_modules/convex/bin/main.js dev --typecheck=disable &
+  elif [ -f "./node_modules/.bin/convex" ]; then
+    ./node_modules/.bin/convex dev --typecheck=disable &
+  else
+    npx convex dev --typecheck=disable &
+  fi
   CONVEX_PID=$!
   # Give the backend time to boot before Vite starts receiving traffic.
   i=0
@@ -36,4 +42,10 @@ if ! curl -s -m 2 -o /dev/null http://127.0.0.1:3210/ 2>/dev/null && \
   fi
 fi
 
-exec node ./node_modules/vite/bin/vite.js --host 0.0.0.0 --port 3000 "$@"
+if [ -f "./node_modules/vite/bin/vite.js" ]; then
+  exec node ./node_modules/vite/bin/vite.js --host 0.0.0.0 --port 3000 "$@"
+elif [ -f "./node_modules/.bin/vite" ]; then
+  exec ./node_modules/.bin/vite --host 0.0.0.0 --port 3000 "$@"
+else
+  exec npx vite --host 0.0.0.0 --port 3000 "$@"
+fi

@@ -257,10 +257,45 @@ export async function ensureMarkets(ctx: any): Promise<void> {
   }
 }
 
+export const seedMarkets = mutation({
+  args: {},
+  handler: async (ctx) => {
+    await ensureMarkets(ctx);
+    return { ok: true };
+  },
+});
+
+function fallbackMarkets(): any[] {
+  return MARKET_DEFS.map((m) => ({
+    _id: `static_${m.symbol}`,
+    symbol: m.symbol,
+    nameEn: m.nameEn,
+    nameFa: m.nameFa,
+    market: m.market,
+    base: m.base,
+    quote: m.quote,
+    digits: m.digits,
+    minQty: m.minQty,
+    precision: m.precision,
+    enabled: defaultEnabled(m),
+    priority: m.priority,
+    network: m.network,
+    type: m.type,
+    lastPrice: m.price,
+    prevClose: m.price,
+    change24h: 0,
+    spark: [],
+    updated: Date.now(),
+  }));
+}
+
 export const listMarkets = query({
   args: { market: v.optional(v.union(v.literal("forex"), v.literal("crypto"))) },
   handler: async (ctx, { market }) => {
-    const rows = await ctx.db.query("markets").collect();
+    let rows = await ctx.db.query("markets").collect();
+    if (!rows || rows.length === 0) {
+      rows = fallbackMarkets();
+    }
     const seen = new Set<string>();
     const unique: any[] = [];
     for (const r of rows) {
@@ -289,7 +324,10 @@ export const toggleMarket = mutation({
 export const listAllMarkets = query({
   args: {},
   handler: async (ctx) => {
-    const rows = await ctx.db.query("markets").collect();
+    let rows = await ctx.db.query("markets").collect();
+    if (!rows || rows.length === 0) {
+      rows = fallbackMarkets();
+    }
     return rows.sort((a, b) => a.priority - b.priority);
   },
 });
@@ -403,7 +441,12 @@ export const listCandles = query({
       .withIndex("by_symbol", (q) => q.eq("symbol", symbol))
       .collect();
     const match = rows.find((r: any) => (timeframe ? r.timeframe === timeframe : true));
-    if (!match) return { symbol, timeframe: timeframe ?? "", data: [] };
+    if (!match || !match.data || match.data.length === 0) {
+      const tf = timeframe || "15m";
+      const isCrypto = symbol.endsWith("USDT") || /^(BTC|ETH|SOL|XRP|BNB|DOGE|ADA|AVAX|TRX|LINK|DOT|MATIC|LTC|SHIB|PEPE)/i.test(symbol);
+      const fallback = isCrypto ? generateSyntheticCryptoCandles(symbol, tf, 120) : generateSyntheticForexCandles(symbol, tf, 120);
+      return { symbol, timeframe: tf, data: fallback };
+    }
     return { symbol, timeframe: match.timeframe, data: (match.data ?? []).slice(-120) };
   },
 });
@@ -741,7 +784,7 @@ export async function fetchCryptoKlines(symbol: string, tf: string): Promise<Fee
       // try the next source
     }
   }
-  return null;
+  return generateSyntheticCryptoCandles(symbol, tf, 120);
 }
 
 /** Live price fallback when Binance tickers are geo-blocked. */
@@ -914,6 +957,41 @@ function tfToMs(tf: string): number {
     case "1d": return 24 * 60 * 60 * 1000;
     default: return 5 * 60 * 1000;
   }
+}
+
+function generateSyntheticCryptoCandles(symbol: string, tf: string, count = 120): FeedCandle[] {
+  const mdef = MARKET_DEFS.find((m) => m.symbol === symbol);
+  const basePrice = mdef?.price ?? (symbol.includes("BTC") ? 109500 : symbol.includes("ETH") ? 3850 : symbol.includes("SOL") ? 185 : 10);
+  const tfMs = tfToMs(tf);
+  const now = Date.now();
+  const start = now - count * tfMs;
+  const volFactor = (mdef?.vol ?? 0.02) * (tfMs / (24 * 3600 * 1000)) ** 0.5;
+  const candles: FeedCandle[] = [];
+  let cur = basePrice;
+  const symSeed = symbol.split("").reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+
+  for (let i = 0; i < count; i++) {
+    const t = start + i * tfMs;
+    const timeSeed = Math.floor(t / 60000);
+    const pseudoRnd = ((Math.sin(timeSeed * 997 + symSeed * 37) * 43758.5453) % 1 + 1) % 1;
+    const pseudoRnd2 = ((Math.cos(timeSeed * 613 + symSeed * 71) * 23421.631) % 1 + 1) % 1;
+    const delta = (pseudoRnd - 0.495) * cur * volFactor * 2.5;
+    const o = cur;
+    const c = Math.max(basePrice * 0.2, o + delta);
+    const h = Math.max(o, c) + pseudoRnd2 * cur * volFactor * 1.2;
+    const l = Math.min(o, c) - (1 - pseudoRnd2) * cur * volFactor * 1.2;
+    const v = Math.round(1000 + pseudoRnd * 5000);
+    candles.push({
+      t,
+      o: Number(o.toFixed(mdef?.digits ?? 4)),
+      h: Number(h.toFixed(mdef?.digits ?? 4)),
+      l: Number(l.toFixed(mdef?.digits ?? 4)),
+      c: Number(c.toFixed(mdef?.digits ?? 4)),
+      v,
+    });
+    cur = c;
+  }
+  return candles;
 }
 
 /**

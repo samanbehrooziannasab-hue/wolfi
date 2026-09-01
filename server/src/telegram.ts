@@ -88,46 +88,142 @@ export async function sendMessage(
   return r?.message_id ?? null;
 }
 
-/** Send a photo (base64 PNG) — used for watermarked chart cards. */
+/** Send a photo (base64 PNG, HTTP URL, or Telegram file_id) — used for watermarked chart cards. */
 export async function sendPhoto(
   chatId: string | number,
-  photoBase64: string,
+  photoInput: string,
   caption: string,
   opts: { parseMode?: "HTML" | "Markdown" } = {}
 ): Promise<number | null> {
-  const r = await call<{ message_id: number }>("sendPhoto", {
-    chat_id: chatId,
-    photo: photoBase64,
-    caption,
-    parse_mode: opts.parseMode ?? "HTML",
-  });
-  await pool.query(
-    `INSERT INTO telegram_messages (chat_id, message_id, direction, type, text, status)
-     VALUES ($1, $2, 'out', 'photo', $3, $4)`,
-    [String(chatId), r?.message_id ?? null, clean(caption, 4000), r ? "sent" : "failed"]
-  );
-  return r?.message_id ?? null;
+  const token = await resolveToken();
+  if (!token || !chatId) return null;
+  const url = `${API}/bot${token}/sendPhoto`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20_000);
+
+  try {
+    let res: Response;
+    const isUrl = photoInput.startsWith("http://") || photoInput.startsWith("https://");
+    const isFileId = !isUrl && /^[a-zA-Z0-9_-]{20,80}$/.test(photoInput.trim());
+
+    if (isUrl || isFileId) {
+      res = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          chat_id: String(chatId),
+          photo: photoInput.trim(),
+          caption,
+          parse_mode: opts.parseMode ?? "HTML",
+        }),
+        signal: controller.signal,
+      });
+    } else {
+      const cleanBase64 = photoInput.replace(/^data:image\/\w+;base64,/, "");
+      const buffer = Buffer.from(cleanBase64, "base64");
+      const form = new FormData();
+      form.append("chat_id", String(chatId));
+      form.append("caption", caption);
+      if (opts.parseMode ?? "HTML") form.append("parse_mode", opts.parseMode ?? "HTML");
+      form.append("photo", new Blob([buffer], { type: "image/png" }), "chart.png");
+
+      res = await fetch(url, {
+        method: "POST",
+        body: form,
+        signal: controller.signal,
+      });
+    }
+
+    const json = (await res.json()) as any;
+    if (!json?.ok) {
+      const description = String(json?.description ?? "unknown error");
+      await logEngine("WARNING", `telegram sendPhoto failed for ${chatId}: ${description}`, null, "bot");
+      return null;
+    }
+    const mid = json.result?.message_id ?? null;
+    if (mid) {
+      await pool.query(
+        `INSERT INTO telegram_messages (chat_id, message_id, direction, type, text, status)
+         VALUES ($1, $2, 'out', 'photo', $3, 'sent')`,
+        [String(chatId), mid, clean(caption, 4000)]
+      );
+    }
+    return mid;
+  } catch (e: any) {
+    await logEngine("WARNING", `telegram sendPhoto error: ${e.message}`, null, "bot");
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
-/** Send an audio narration (base64 mp3/ogg) — used for education lessons. */
+/** Send an audio narration (base64 mp3/ogg or HTTP URL) — used for education lessons. */
 export async function sendAudio(
   chatId: string | number,
-  audioBase64: string,
+  audioInput: string,
   caption: string,
   opts: { parseMode?: "HTML" | "Markdown" } = {}
 ): Promise<number | null> {
-  const r = await call<{ message_id: number }>("sendAudio", {
-    chat_id: chatId,
-    audio: audioBase64,
-    caption,
-    parse_mode: opts.parseMode ?? "HTML",
-  });
-  await pool.query(
-    `INSERT INTO telegram_messages (chat_id, message_id, direction, type, text, status)
-     VALUES ($1, $2, 'out', 'audio', $3, $4)`,
-    [String(chatId), r?.message_id ?? null, clean(caption, 4000), r ? "sent" : "failed"]
-  );
-  return r?.message_id ?? null;
+  const token = await resolveToken();
+  if (!token || !chatId) return null;
+  const url = `${API}/bot${token}/sendAudio`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30_000);
+
+  try {
+    let res: Response;
+    const isUrl = audioInput.startsWith("http://") || audioInput.startsWith("https://");
+    const isFileId = !isUrl && /^[a-zA-Z0-9_-]{20,80}$/.test(audioInput.trim());
+
+    if (isUrl || isFileId) {
+      res = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          chat_id: String(chatId),
+          audio: audioInput.trim(),
+          caption,
+          parse_mode: opts.parseMode ?? "HTML",
+        }),
+        signal: controller.signal,
+      });
+    } else {
+      const cleanBase64 = audioInput.replace(/^data:audio\/\w+;base64,/, "");
+      const buffer = Buffer.from(cleanBase64, "base64");
+      const form = new FormData();
+      form.append("chat_id", String(chatId));
+      form.append("caption", caption);
+      if (opts.parseMode ?? "HTML") form.append("parse_mode", opts.parseMode ?? "HTML");
+      form.append("audio", new Blob([buffer], { type: "audio/mpeg" }), "narration.mp3");
+
+      res = await fetch(url, {
+        method: "POST",
+        body: form,
+        signal: controller.signal,
+      });
+    }
+
+    const json = (await res.json()) as any;
+    if (!json?.ok) {
+      const description = String(json?.description ?? "unknown error");
+      await logEngine("WARNING", `telegram sendAudio failed for ${chatId}: ${description}`, null, "bot");
+      return null;
+    }
+    const mid = json.result?.message_id ?? null;
+    if (mid) {
+      await pool.query(
+        `INSERT INTO telegram_messages (chat_id, message_id, direction, type, text, status)
+         VALUES ($1, $2, 'out', 'audio', $3, 'sent')`,
+        [String(chatId), mid, clean(caption, 4000)]
+      );
+    }
+    return mid;
+  } catch (e: any) {
+    await logEngine("WARNING", `telegram sendAudio error: ${e.message}`, null, "bot");
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** Telegram channel membership check via getChatMember. */

@@ -990,17 +990,13 @@ app.post("/api/ai/prune", requireUser, async (c) => {
 
 // ── markets / chart / engine analysis ────────────────────────────────────────
 app.get("/api/markets", async (c) => {
+  const showAll = c.req.query("all") === "true";
+  const where = showAll ? "" : "WHERE enabled = true";
   const markets = await many(
-    `SELECT symbol, name_en, name_fa, market, base, quote, digits, type, last_price, change_24h, updated_at
-       FROM markets WHERE enabled = true ORDER BY market, priority`
+    `SELECT symbol, name_en, name_fa, market, base, quote, digits, type, last_price, change_24h, priority, enabled, updated_at
+       FROM markets ${where} ORDER BY market, priority`
   );
-  const live = await Promise.all(
-    markets.slice(0, 60).map(async (m) => {
-      const t = await fetchTicker(m.symbol).catch(() => null);
-      return { ...m, last_price: t?.price ?? m.last_price, change_24h: t?.change24h ?? m.change_24h };
-    })
-  );
-  return c.json({ markets: live });
+  return c.json({ markets });
 });
 
 app.get("/api/markets/:symbol/candles", async (c) => {
@@ -2936,8 +2932,8 @@ app.post("/api/admin/telegram/chart", requireAdmin, async (c) => {
   const tf = clean(body.timeframe ?? "15m", 8);
   const lang = body.lang === "en" ? "en" : "fa";
   const s = await getSettings();
-  const chatId = String(s["telegram.channelId"] ?? "").trim();
-  if (!chatId) return c.json({ error: "آیدی کانال تلگرام تنظیم نشده است (اتصالات)." }, 400);
+  const chatId = String(s["channel.id"] || s["telegram.channelId"] || s["channel.username"] || s["telegram.channelUsername"] || "").trim();
+  if (!chatId) return c.json({ error: "شناسه یا یوزرنیم کانال تلگرام تنظیم نشده است (در بخش تنظیمات کانال وارد کنید)." }, 400);
   const candles = await many("SELECT t, o, h, l, c FROM candles WHERE symbol = $1 AND timeframe = $2 ORDER BY t ASC LIMIT 60", [symbol, tf]);
   if (candles.length < 5) return c.json({ error: `کندلی برای ${symbol} ${tf} ذخیره نشده است — ابتدا موتور را اجرا کنید.` }, 400);
   const entry = Number(body.entry);
@@ -2955,7 +2951,7 @@ app.post("/api/admin/telegram/chart", requireAdmin, async (c) => {
   });
   const caption = clean(body.caption, 1000) || (lang === "fa" ? `🐺 چارت ${symbol} · تایم‌فریم ${tf} — #${symbol} #wolf_ai #chart` : `🐺 ${symbol} chart · ${tf} timeframe — #${symbol} #wolf_ai #chart`);
   const messageId = await sendPhoto(chatId, Buffer.from(png).toString("base64"), caption);
-  if (!messageId) return c.json({ error: "ارسال به کانال ناموفق بود — توکن ربات/آیدی کانال را بررسی کنید." }, 400);
+  if (!messageId) return c.json({ error: "ارسال به کانال ناموفق بود — اطمینان حاصل کنید ربات به عنوان ادمین با دسترسی پست در کانال عضو است." }, 400);
   await audit("telegram_chart", admin.username, admin.id, "telegram", { symbol, tf });
   return c.json({ ok: true, messageId });
 });
@@ -2967,8 +2963,8 @@ app.post("/api/admin/positions/:id/telegram", requireAdmin, async (c) => {
   const p = await one<Row>("SELECT * FROM open_positions WHERE id = $1", [id]);
   if (!p) return c.json({ error: "پوزیشن یافت نشد." }, 404);
   const s = await getSettings();
-  const chatId = String(s["telegram.channelId"] ?? "").trim();
-  if (!chatId) return c.json({ error: "آیدی کانال تلگرام تنظیم نشده است." }, 400);
+  const chatId = String(s["channel.id"] || s["telegram.channelId"] || s["channel.username"] || s["telegram.channelUsername"] || "").trim();
+  if (!chatId) return c.json({ error: "شناسه یا یوزرنیم کانال تلگرام تنظیم نشده است (در بخش تنظیمات کانال وارد کنید)." }, 400);
   const candles = await many("SELECT t, o, h, l, c FROM candles WHERE symbol = $1 AND timeframe = '15m' ORDER BY t ASC LIMIT 60", [p.symbol]);
   let photoSent = false;
   if (candles.length >= 5) {
@@ -2986,7 +2982,7 @@ app.post("/api/admin/positions/:id/telegram", requireAdmin, async (c) => {
   }
   const text = `🐺 <b>${p.symbol}</b> — ${p.side === "short" ? "SHORT" : "LONG"}\n💰 ورود: <b>${num(p.entry)}</b>\n🛑 حد ضرر: ${num(p.stop_loss)}\n🎯 هدف: ${num(p.take_profit)}\n📈 سود/زیان: ${num(p.pnl) >= 0 ? "+" : ""}${num(p.pnl)} USDT\n⚙️ مود: ${p.mode ?? "demo"} · منبع: ${p.source ?? "engine"}`;
   const mid = await sendMessage(chatId, text);
-  if (!mid && !photoSent) return c.json({ error: "ارسال به کانال ناموفق بود." }, 400);
+  if (!mid && !photoSent) return c.json({ error: "ارسال پیام به کانال ناموفق بود. اطمینان حاصل کنید ربات با دسترسی ارسال پیام در کانال ادمین است." }, 400);
   await audit("position_telegram", admin.username, admin.id, "telegram", { symbol: p.symbol });
   return c.json({ ok: true, photo: photoSent, messageId: mid ?? null });
 });
@@ -3037,7 +3033,16 @@ app.post("/api/admin/telegram/send", requireAdmin, async (c) => {
   }
   // Test mode "channels": post to both configured channel ids.
   if (body.test === "channels") {
-    const channels = [String(s["channel.id"] ?? ""), String(s["channel.enId"] ?? "")].filter(Boolean);
+    const rawChannels = [
+      String(s["channel.id"] || s["telegram.channelId"] || s["channel.username"] || s["telegram.channelUsername"] || "").trim(),
+      String(s["channel.enId"] || s["telegram.channelEnId"] || s["channel.enUsername"] || "").trim(),
+    ].filter(Boolean);
+    const channels = Array.from(new Set(rawChannels));
+
+    if (channels.length === 0) {
+      return c.json({ ok: false, sent: 0, error: "شناسه یا یوزرنیم کانال تلگرام تنظیم نشده است. ابتدا در تنظیمات کانال آن را وارد و ذخیره فرمایید." }, 400);
+    }
+
     let sent = 0;
     for (const ch of channels) {
       try {
@@ -3048,7 +3053,10 @@ app.post("/api/admin/telegram/send", requireAdmin, async (c) => {
       }
     }
     await audit("telegram_admin_send", admin.username, admin.id, "telegram", { test: "channels", sent });
-    return c.json({ ok: sent > 0, sent });
+    if (sent === 0) {
+      return c.json({ ok: false, sent: 0, error: `ارسال پیام تست به کانال (${channels.join(", ")}) ناموفق بود. اطمینان حاصل کنید ربات به عنوان ادمین با دسترسی ارسال پیام در کانال اضافه شده است.` }, 400);
+    }
+    return c.json({ ok: true, sent });
   }
   const userId = clean(body.userId, 100);
   const target = userId

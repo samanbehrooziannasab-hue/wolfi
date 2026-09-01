@@ -51,6 +51,23 @@ function tfToMs(tf: string): number {
   return 15 * 60 * 1000;
 }
 
+function getSymbolBasePrice(symbol?: string, entry?: number): number {
+  if (entry && entry > 0) return entry;
+  if (!symbol) return 100;
+  const s = symbol.toUpperCase();
+  if (s.includes("BTC")) return 109500;
+  if (s.includes("ETH")) return 3850;
+  if (s.includes("SOL")) return 185;
+  if (s.includes("XAU") || s.includes("GOLD")) return 3245;
+  if (s.includes("XAG") || s.includes("SILVER")) return 38.2;
+  if (s.includes("BNB")) return 680;
+  if (s.includes("XRP")) return 2.35;
+  if (s.includes("DOGE")) return 0.22;
+  if (s.includes("JPY")) return 154.8;
+  if (s.includes("EUR") || s.includes("GBP") || s.includes("AUD")) return 1.15;
+  return 100;
+}
+
 function generateDemoCandles(count: number, startPrice: number, volatility: number, tfMs: number): Candle[] {
   const now = Date.now();
   const result: Candle[] = [];
@@ -106,17 +123,23 @@ export function LiveChart({
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const levelsRef = useRef<any[]>([]);
 
+  const basePrice = getSymbolBasePrice(symbol, entry);
   const [candles, setCandles] = useState<Candle[]>(
     () =>
-      candlesProp ??
-      generateDemoCandles(80, entry ?? 100, symbol?.includes("BTC") ? 1.8 : symbol?.includes("ETH") ? 2.4 : 0.85, tfToMs(timeframe)),
+      (candlesProp && candlesProp.length > 0) ? candlesProp :
+      generateDemoCandles(80, basePrice, symbol?.includes("BTC") ? 1.8 : symbol?.includes("ETH") ? 2.4 : 0.85, tfToMs(timeframe)),
   );
   const [dataSource, setDataSource] = useState<"live" | "demo">("demo");
 
   // real market data: Binance (crypto) / Yahoo Finance (forex & metals)
   useEffect(() => {
+    if (candlesProp && candlesProp.length > 0) {
+      setCandles(candlesProp);
+      setDataSource("live");
+      return;
+    }
     if (!symbol) {
-      setCandles(candlesProp ?? generateDemoCandles(80, entry ?? 100, 1, tfToMs(timeframe)));
+      setCandles(generateDemoCandles(80, basePrice, 1, tfToMs(timeframe)));
       setDataSource("demo");
       return;
     }
@@ -128,9 +151,9 @@ export function LiveChart({
 
     const demoFallback = () => {
       if (cancelled) return;
+      const bp = getSymbolBasePrice(sym, entry);
       setCandles(
-        candlesProp ??
-          generateDemoCandles(80, entry ?? 100, sym.includes("BTC") ? 1.8 : sym.includes("ETH") ? 2.4 : 0.85, tfToMs(tf)),
+        generateDemoCandles(80, bp, sym.includes("BTC") ? 1.8 : sym.includes("ETH") ? 2.4 : 0.85, tfToMs(tf)),
       );
       setDataSource("demo");
     };
