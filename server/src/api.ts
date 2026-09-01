@@ -1192,7 +1192,7 @@ app.get("/api/admin/workspace", requireStaff, async (c) => {
     safeMany("SELECT wt.*, u.username FROM wallet_transactions wt LEFT JOIN users u ON u.id = wt.user_id ORDER BY wt.created_at DESC LIMIT 300"),
     safeMany("SELECT * FROM telegram_messages ORDER BY created_at DESC LIMIT 200"),
     safeMany("SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 300"),
-    safeMany("SELECT symbol, name_en, name_fa, market, base, quote, digits, type, last_price, prev_close, change_24h, priority, enabled, updated_at FROM markets ORDER BY market, priority"),
+    safeMany("SELECT * FROM markets ORDER BY market, priority"),
   ]);
 
   const settings = await getSettings().catch(() => ({}));
