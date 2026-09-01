@@ -25,7 +25,7 @@ import {
 import { encryptSecret, decryptSecret } from "./util.js";
 import { adapters, paperAdapter, fetchTicker, fetchKlines } from "./exchanges.js";
 import { aiAsk, aiAskJson } from "./ai.js";
-import { handleTelegramUpdate, sendMessage, sendPhoto, setWebhook, getWebhookInfoApi, verifyInitData, miniAppLogin, invalidateTelegramTokenCache } from "./telegram.js";
+import { handleTelegramUpdate, sendMessage, sendPhoto, setWebhook, getWebhookInfoApi, verifyInitData, miniAppLogin, invalidateTelegramTokenCache, notifyTradeChannel } from "./telegram.js";
 import { engineTick, closePosition, closeAllPositions, emergencyStop } from "./engine.js";
 import { startPrediction, resolvePrediction, startQuiz, resolveQuiz, buyCoinPackage, unlockSignalDetail, coinPackages } from "./game.js";
 import { runBacktest, runTuner, manualOpen, runResearch } from "./engine-tools.js";
@@ -37,7 +37,8 @@ import {
   sendAllPositionsToTelegram,
 } from "./ai-learning.js";
 import { publicStrategies, strategyFamilies } from "./rest-parity.js";
-import { listStrategyPresets, applyStrategyPreset } from "./strategy-presets.js";
+import { listStrategyPresets, applyStrategyPreset, applyMultipleStrategyPresets } from "./strategy-presets.js";
+import { seedMarkets } from "./seed.js";
 import { swapwalletBase, prices as swapPrices, balances as swapBalances, transactions as swapTransactions, transaction as swapTransaction, fastSwap, quote as swapQuote, executeQuote, withdrawConfig as swapWithdrawConfig, withdraw as swapWithdraw } from "./swapwallet.js";
 
 export const app = new Hono();
@@ -2161,6 +2162,10 @@ app.post("/api/admin/emergency/close-all", requireAdmin, async (c) => {
 // returns immediately instead of stacking heavy engine work.
 let scanInflight: Promise<any> | null = null;
 app.post("/api/admin/engine/scan", requireAdmin, async (c) => {
+  const s = await getSettings();
+  if (s["engine.emergencyStop"]) {
+    return c.json({ error: "سیستم در حالت توقف اضطراری قرار دارد." }, 400);
+  }
   if (scanInflight) return c.json({ ok: true, queued: true, running: true });
   scanInflight = engineTick()
     .catch((e: any) => ({ ok: false, error: String(e?.message ?? e) }))
@@ -2180,8 +2185,11 @@ app.post("/api/admin/engine/mode", requireAdmin, async (c) => {
     mode = body.liveTradingEnabled === true || body.live === true ? "live" : "demo";
   }
   if (body.confirmPhrase === "بستن") body.confirm = "CLOSE_ALL";
-  if (mode === "live" && body.confirm !== "LIVE") {
-    return c.json({ error: "برای فعال‌سازی Live باید عبارت تأیید وارد شود." }, 400);
+  if (mode === "live") {
+    const liveExchanges = await many("SELECT * FROM exchange_accounts WHERE enabled = true AND environment = 'live' AND api_key_enc IS NOT NULL AND api_key_enc != ''");
+    if (!liveExchanges.length) {
+      return c.json({ error: "برای فعال‌سازی معامله واقعی، حداقل یک حساب صرافی لایو فعال با کلید معتبر لازم است." }, 400);
+    }
   }
   const writes: Array<[string, unknown]> = [["engine.mode", mode]];
   if (body.engineEnabled !== undefined) writes.push(["engine.enabled", !!body.engineEnabled]);
@@ -2195,6 +2203,117 @@ app.post("/api/admin/engine/mode", requireAdmin, async (c) => {
   for (const [k, v] of writes) await setSetting(k, v, "engine", admin.username);
   await audit("engine_mode", admin.username, admin.id, "engine", { mode, fields: writes.map((w) => w[0]) });
   return c.json({ ok: true, mode });
+});
+
+// ── ADMIN: Market toggle & Seed ──────────────────────────────────────────────
+app.patch("/api/admin/markets/:symbol", requireAdmin, async (c) => {
+  const admin = userOf(c);
+  const symbol = clean(c.req.param("symbol"), 20).toUpperCase();
+  const body = await c.req.json().catch(() => ({}));
+  const enabled = body.enabled !== undefined ? !!body.enabled : true;
+  const r = await pool.query("UPDATE markets SET enabled = $1 WHERE UPPER(symbol) = UPPER($2) RETURNING *", [enabled, symbol]);
+  if (!r.rows.length) return c.json({ error: "نماد یافت نشد." }, 404);
+  await audit("market_toggle", admin.username, admin.id, "market", { symbol, enabled });
+  return c.json({ ok: true, market: r.rows[0] });
+});
+
+app.post("/api/admin/markets/seed", requireAdmin, async (c) => {
+  const admin = userOf(c);
+  try {
+    await seedMarkets();
+    await audit("markets_seeded", admin.username, admin.id, "markets", null);
+    return c.json({ ok: true, message: "بازارها مجدداً مقداردهی شدند." });
+  } catch (e: any) {
+    return c.json({ error: e.message }, 400);
+  }
+});
+
+// ── ADMIN: Strategy Multiple Presets ─────────────────────────────────────────
+app.post("/api/admin/strategies/presets/apply-multiple", requireAdmin, async (c) => {
+  const admin = userOf(c);
+  const body = await c.req.json().catch(() => ({}));
+  const presetIds = Array.isArray(body.presetIds) ? body.presetIds : Array.isArray(body.presets) ? body.presets : [];
+  try {
+    const res = await applyMultipleStrategyPresets(presetIds, admin.username);
+    await audit("strategy_preset_multiple_apply", admin.username, admin.id, "strategies", { presetIds });
+    return c.json(res);
+  } catch (e: any) {
+    return c.json({ error: e.message }, 400);
+  }
+});
+
+// ── ADMIN: VIP trial & discount ──────────────────────────────────────────────
+app.post("/api/admin/users/claim-vip-trial", requireAdmin, async (c) => {
+  const admin = userOf(c);
+  const body = await c.req.json().catch(() => ({}));
+  const userId = clean(body.userId ?? admin.id, 100);
+  const res = await grantFreeTrial(userId, admin.username);
+  if (!res.ok) return c.json({ error: res.reason ?? "تست رایگان امکان‌پذیر نیست." }, 400);
+  return c.json(res);
+});
+
+app.post("/api/admin/discount/apply", requireAdmin, async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const code = clean(body.code, 50).toUpperCase();
+  if (!code) return c.json({ error: "کد تخفیف وارد نشده است." }, 400);
+  const voucher = await one("SELECT * FROM coin_vouchers WHERE UPPER(code) = $1 AND enabled = true", [code]);
+  if (!voucher) return c.json({ error: "کد تخفیف یا ووچر نامعتبر است." }, 400);
+  return c.json({ ok: true, valid: true, discountPercent: num(voucher.discount_percent ?? 10), code });
+});
+
+// ── USER: Wallet TOMAN/USDT swaps ────────────────────────────────────────────
+app.post("/api/coins/swap-toman-usdt", async (c) => {
+  const user = userOf(c);
+  const body = await c.req.json().catch(() => ({}));
+  const amountIrt = num(body.amount ?? body.irtAmount);
+  if (amountIrt <= 0) return c.json({ error: "مبلغ نامعتبر است." }, 400);
+  const irtRate = num((await getSetting("rate.tomanUsdt")) ?? 60000) || 60000;
+  const usdtAmount = amountIrt / irtRate;
+  await tx(async (c2) => {
+    const wIrt = await c2.query("SELECT balance FROM wallets WHERE user_id = $1 AND asset = 'IRT' FOR UPDATE", [user.id]);
+    const balIrt = num(wIrt.rows[0]?.balance);
+    if (balIrt < amountIrt) throw new Error("موجودی تومان کافی نیست.");
+    await c2.query("UPDATE wallets SET balance = balance - $2 WHERE user_id = $1 AND asset = 'IRT'", [user.id, amountIrt]);
+    await c2.query("INSERT INTO wallets (user_id, asset, network, balance) VALUES ($1, 'USDT', 'TRC20', $2) ON CONFLICT (user_id, asset, network) DO UPDATE SET balance = wallets.balance + EXCLUDED.balance", [user.id, usdtAmount]);
+  });
+  return c.json({ ok: true, swappedIrt: amountIrt, receivedUsdt: usdtAmount });
+});
+
+app.post("/api/coins/swap-usdt-toman", async (c) => {
+  const user = userOf(c);
+  const body = await c.req.json().catch(() => ({}));
+  const amountUsdt = num(body.amount ?? body.usdtAmount);
+  if (amountUsdt <= 0) return c.json({ error: "مبلغ نامعتبر است." }, 400);
+  const irtRate = num((await getSetting("rate.tomanUsdt")) ?? 60000) || 60000;
+  const irtAmount = amountUsdt * irtRate;
+  await tx(async (c2) => {
+    const wUsdt = await c2.query("SELECT balance FROM wallets WHERE user_id = $1 AND asset = 'USDT' FOR UPDATE", [user.id]);
+    const balUsdt = num(wUsdt.rows[0]?.balance);
+    if (balUsdt < amountUsdt) throw new Error("موجودی USDT کافی نیست.");
+    await c2.query("UPDATE wallets SET balance = balance - $2 WHERE user_id = $1 AND asset = 'USDT'", [user.id, amountUsdt]);
+    await c2.query("INSERT INTO wallets (user_id, asset, network, balance) VALUES ($1, 'IRT', 'INTERNAL', $2) ON CONFLICT (user_id, asset, network) DO UPDATE SET balance = wallets.balance + EXCLUDED.balance", [user.id, irtAmount]);
+  });
+  return c.json({ ok: true, swappedUsdt: amountUsdt, receivedIrt: irtAmount });
+});
+
+// ── ADMIN: Chart Preview & Signal Telegram ────────────────────────────────────
+app.post("/api/admin/charts/preview", requireAdmin, async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const symbol = clean(body.symbol ?? body.symbolId ?? "BTCUSDT", 20).toUpperCase();
+  const tf = clean(body.timeframe ?? body.tf ?? "15m", 8);
+  const candles = await many("SELECT t, o, h, l, c, v FROM candles WHERE symbol = $1 AND timeframe = $2 ORDER BY t ASC LIMIT 100", [symbol, tf]);
+  const pngBase64 = renderCandleChartPng(symbol, tf, candles);
+  return c.json({ ok: true, symbol, timeframe: tf, imageBase64: pngBase64, image: pngBase64 });
+});
+
+app.post("/api/admin/signals/:id/telegram", requireAdmin, async (c) => {
+  const admin = userOf(c);
+  const id = c.req.param("id");
+  const sig = await one("SELECT * FROM signals WHERE id = $1", [id]);
+  if (!sig) return c.json({ error: "سیگنال یافت نشد." }, 404);
+  await notifyTradeChannel(sig, "signal");
+  await audit("signal_sent_telegram", admin.username, admin.id, "signal", { id, symbol: sig.symbol });
+  return c.json({ ok: true, message: "سیگنال با موفقیت به تلگرام ارسال شد." });
 });
 
 // ── ADMIN: engine tools (backtest / tuner / research / manual open) ─────────

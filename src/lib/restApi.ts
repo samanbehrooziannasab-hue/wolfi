@@ -562,9 +562,14 @@ export function useRestMutation(reference: any): (args?: any) => Promise<any> {
       // historical namespace → telegram/admin bridges handled below
     }
 
-    const spec = MUTATIONS[name] ?? routeFor(name);
+    const spec = MUTATIONS[name] ?? (ROUTES[name] && typeof ROUTES[name] === "object" && (ROUTES[name] as any).m !== "GET" ? ROUTES[name] : null);
+    if (!spec) {
+      throw new Error(`عملیات ${name} در سرور تعریف نشده است. (تابع نگاشت‌نشده)`);
+    }
     const { method, path, body } = resolveSpec(spec, cleanArgs);
-    const result = await restCall(method, path, method === "GET" ? undefined : (body ?? {}));
+    const isSlow = typeof spec !== "string" && Boolean((spec as any).slow);
+    const timeoutMs = isSlow ? 120_000 : 30_000;
+    const result = await restCall(method, path, method === "GET" ? undefined : (body ?? {}), timeoutMs);
     bumpAll(); // refetch every mounted query after any write
     return result;
   }, [name]);
@@ -580,7 +585,11 @@ const MUTATIONS: Record<string, Spec> = {
   // strategies & markets
   "strategies:toggleStrategy": { m: "PATCH", p: (a) => `/admin/strategies/${uid(a, "key", "strategyKey")}`, b: (a) => ({ enabled: a?.enabled }) },
   "strategies:applyStrategyPreset": { m: "POST", p: "/admin/strategies/preset", b: (a) => ({ preset: a?.presetId ?? a?.preset }) },
+  "strategies:applyMultipleStrategyPresets": { m: "POST", p: "/admin/strategies/presets/apply-multiple", b: (a) => ({ presetIds: a?.presetIds ?? a?.presets ?? [] }) },
   "markets:toggleMarket": { m: "PATCH", p: (a) => `/admin/markets/${uid(a, "symbol")}`, b: (a) => ({ enabled: a?.enabled ?? true }) },
+  "markets:seedMarkets": { m: "POST", p: "/admin/markets/seed" },
+  "admin:claimVipTrial": { m: "POST", p: "/admin/users/claim-vip-trial", b: (a) => stripToken(a) },
+  "admin:applyDiscountCode": { m: "POST", p: "/admin/discount/apply", b: (a) => ({ code: a?.code, userId: a?.userId }) },
 
   // engine control & ops
   "engineWorker:runScanNow": { m: "POST", p: "/admin/engine/scan", slow: true },
@@ -645,9 +654,13 @@ const MUTATIONS: Record<string, Spec> = {
 
   // coins economy
   "coins:buyWolfCoins": { m: "POST", p: "/coins/buy", b: (a) => stripToken(a) },
+  "coins:buyWolfCoinsWithUsdt": { m: "POST", p: "/coins/buy-wolf", b: (a) => ({ ...stripToken(a), paymentMethod: "usdt" }) },
   "coins:burnCoins": { m: "POST", p: "/coins/burn", b: (a) => stripToken(a) },
   "coins:claimProfileReward": { m: "POST", p: "/coins/claim-reward" },
   "coins:buyCoinPackage": { m: "POST", p: "/coins/package", b: (a) => stripToken(a) },
+  "coins:buyCoinPackageWithUsdt": { m: "POST", p: "/coins/package", b: (a) => ({ ...stripToken(a), paymentMethod: "usdt" }) },
+  "coins:swapTomanToUsdt": { m: "POST", p: "/coins/swap-toman-usdt", b: (a) => stripToken(a) },
+  "coins:swapUsdtToToman": { m: "POST", p: "/coins/swap-usdt-toman", b: (a) => stripToken(a) },
   "coins:startQuiz": { m: "POST", p: "/coins/quiz/start", b: (a) => stripToken(a) },
   "coins:resolveQuiz": { m: "POST", p: "/coins/quiz/resolve", b: (a) => stripToken(a) },
   "coins:startPrediction": { m: "POST", p: "/coins/prediction/start", b: (a) => stripToken(a) },
@@ -683,9 +696,10 @@ const MUTATIONS: Record<string, Spec> = {
   "nodeCalls:telegramTestChannels": { m: "POST", p: "/admin/telegram/send", b: (a) => ({ test: "channels", text: a?.text ?? "تست کانال‌ها 🐺", ...stripToken(a) }) },
 
   // adminActions → telegram / positions broadcast
-  "adminActions:sendSignalToChannel": { m: "POST", p: "/admin/telegram/send", b: (a) => ({ kind: "signal", ...stripToken(a) }) },
+  "adminActions:sendSignalToChannel": { m: "POST", p: (a) => a?.id || a?.signalId ? `/admin/signals/${uid(a, "signalId", "id")}/telegram` : "/admin/telegram/send", b: (a) => ({ kind: "signal", text: a?.text, signalId: a?.signalId ?? a?.id, ...stripToken(a) }) },
   "adminActions:sendChartToChannel": { m: "POST", p: "/admin/telegram/chart", b: (a) => stripToken(a) },
-  "adminActions:chartImageFor": { m: "POST", p: "/admin/telegram/chart", b: (a) => stripToken(a) },
+  "adminActions:chartImageFor": { m: "POST", p: "/admin/charts/preview", b: (a) => stripToken(a) },
+  "admin:chartImagePreview": { m: "POST", p: "/admin/charts/preview", b: (a) => stripToken(a) },
   "adminActions:sendPositionToChannels": { m: "POST", p: (a) => `/admin/positions/${uid(a, "positionId", "id")}/telegram` },
   "adminActions:sendAllPositionsToTelegram": { m: "POST", p: "/admin/positions/send-all-telegram" },
   "admin:sendAllPositionsToTelegram": { m: "POST", p: "/admin/positions/send-all-telegram" },

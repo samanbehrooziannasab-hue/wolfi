@@ -175,3 +175,36 @@ export async function applyStrategyPreset(presetId: string, by?: string | null):
   await logEngine("INFO", `strategy-preset applied=${id} changed=${changed}`, null, "system");
   return { ok: true, preset: id, enabled: enabled ? keys.length || rows.length : 0, changed };
 }
+
+export async function applyMultipleStrategyPresets(presetIds: string[], by?: string | null): Promise<any> {
+  if (!Array.isArray(presetIds) || presetIds.length === 0) throw new Error("presetIds_required");
+  const allKeys = new Set<string>();
+  const mergedRisk: Record<string, any> = {};
+  for (const pid of presetIds) {
+    const id = clean(String(pid ?? ""), 30).trim().toLowerCase();
+    const preset = getStrategyPreset(id);
+    if (preset) {
+      for (const k of preset.keys) allKeys.add(k);
+      Object.assign(mergedRisk, preset.risk);
+    }
+  }
+  if (allKeys.size === 0) throw new Error("no_valid_presets");
+  const rows = await many("SELECT id, key, enabled, engine_enabled FROM strategies");
+  let changed = 0;
+  for (const row of rows) {
+    const key = String(row.key);
+    const on = allKeys.has(key);
+    const cur = boolValue(row.enabled) && boolValue(row.engine_enabled);
+    if (cur !== on) {
+      await pool.query("UPDATE strategies SET enabled = $1, engine_enabled = $1 WHERE id = $2", [on, row.id]);
+      changed++;
+    }
+  }
+  for (const [k, val] of Object.entries(mergedRisk)) {
+    await setSetting(k, val, "admin:strategy-preset", by ?? null);
+  }
+  const primary = presetIds[0];
+  await setSetting("engine.strategyPreset", primary, "admin:strategy-preset", by ?? null);
+  await logEngine("INFO", `multiple-strategy-presets applied=${presetIds.join(",")} changed=${changed}`, null, "system");
+  return { ok: true, presets: presetIds, enabled: allKeys.size, changed };
+}

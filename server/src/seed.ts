@@ -104,33 +104,7 @@ const VIP_PACKAGES = [
   },
 ];
 
-export async function seed(): Promise<void> {
-  // ── admin user ─────────────────────────────────────────────────────────────
-  const adminUser = process.env.ADMIN_USERNAME || "wolfadmin";
-  const adminPass = process.env.ADMIN_PASSWORD || "Wolf3010!";
-  const adminHash = await hashPassword(adminPass);
-  // Repair policy for an EXISTING admin row:
-  //  - always fix the flags (an early seed wrote is_assistant=true — the
-  //    "admin shows up as assistant" bug — and could leave the role broken);
-  //  - restore the default password ONLY when the row is unusable (no hash)
-  //    or still carries that old-seed bug flag. A password the admin changed
-  //    deliberately is never clobbered by a routine `update.sh` re-seed.
-  await pool.query(
-    `INSERT INTO users (username, password_hash, name, role, is_admin, is_assistant, is_vip, can_trade, language, theme)
-     VALUES ($1, $2, 'Trading Wolf Admin', 'admin', true, false, true, true, 'fa', 'dark')
-     ON CONFLICT (username) DO UPDATE SET
-       name = EXCLUDED.name, is_admin = true, is_assistant = false, is_vip = true,
-       enabled = true, can_trade = true, role = 'admin', language = EXCLUDED.language, theme = EXCLUDED.theme,
-       password_hash = CASE
-         WHEN users.password_hash IS NULL OR users.is_assistant = true
-           THEN EXCLUDED.password_hash
-         ELSE users.password_hash
-       END`,
-    [adminUser, adminHash]
-  );
-  console.log(`✔ admin user: ${adminUser}`);
-
-  // ── markets ────────────────────────────────────────────────────────────────
+export async function seedMarkets(): Promise<void> {
   let mi = 1;
   for (const [sym, en, fa, base, network, type] of CRYPTO) {
     await pool.query(
@@ -152,12 +126,31 @@ export async function seed(): Promise<void> {
     );
     mi++;
   }
-  console.log(`✔ markets: ${CRYPTO.length} crypto + ${FOREX.length} forex/metals`);
+}
 
-  // ── REST server currently has crypto adapters only; keep every forex row disabled.
-  // This runs after the upserts so a later seed/update cannot re-enable invalid feeds.
-  await pool.query("UPDATE markets SET enabled = false WHERE market = 'forex'");
-  console.log("✔ forex/metals disabled — no compatible REST market-data provider configured");
+export async function seed(): Promise<void> {
+  // ── admin user ─────────────────────────────────────────────────────────────
+  const adminUser = process.env.ADMIN_USERNAME || "wolfadmin";
+  const adminPass = process.env.ADMIN_PASSWORD || "Wolf3010!";
+  const adminHash = await hashPassword(adminPass);
+  await pool.query(
+    `INSERT INTO users (username, password_hash, name, role, is_admin, is_assistant, is_vip, can_trade, language, theme)
+     VALUES ($1, $2, 'Trading Wolf Admin', 'admin', true, false, true, true, 'fa', 'dark')
+     ON CONFLICT (username) DO UPDATE SET
+       name = EXCLUDED.name, is_admin = true, is_assistant = false, is_vip = true,
+       enabled = true, can_trade = true, role = 'admin', language = EXCLUDED.language, theme = EXCLUDED.theme,
+       password_hash = CASE
+         WHEN users.password_hash IS NULL OR users.is_assistant = true
+           THEN EXCLUDED.password_hash
+         ELSE users.password_hash
+       END`,
+    [adminUser, adminHash]
+  );
+  console.log(`✔ admin user: ${adminUser}`);
+
+  // ── markets ────────────────────────────────────────────────────────────────
+  await seedMarkets();
+  console.log(`✔ markets: ${CRYPTO.length} crypto + ${FOREX.length} forex/metals`);
 
   // ── strategies ─────────────────────────────────────────────────────────────
   let si = 0;
