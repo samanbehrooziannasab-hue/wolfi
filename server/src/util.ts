@@ -49,6 +49,15 @@ export function hmacSha256(key: string, data: string): string {
   return crypto.createHmac("sha256", key).update(data).digest("hex");
 }
 
+/** Constant-time string equality check to prevent timing side-channel attacks. */
+export function safeEqual(a: string, b: string): boolean {
+  if (typeof a !== "string" || typeof b !== "string") return false;
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
 /** Sign a session/JWT-like token with HMAC: payload.signature */
 export function signToken(payload: Record<string, unknown>, ttlMs: number): string {
   const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
@@ -63,7 +72,7 @@ export function verifyToken(token: string): Record<string, unknown> | null {
   if (parts.length !== 3) return null;
   const [body, exp, sig] = parts;
   const expect = hmacSha256(config.appSecret, `${body}.${exp}`);
-  if (sig !== expect) return null;
+  if (!safeEqual(sig, expect)) return null;
   if (Number(exp) < Date.now()) return null;
   try {
     return JSON.parse(Buffer.from(body, "base64url").toString("utf8"));

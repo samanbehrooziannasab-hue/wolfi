@@ -96,7 +96,19 @@ app.onError((error, c) => {
   }, 500);
 });
 
-app.use("*", cors({ origin: config.corsOrigins, credentials: true }));
+app.use(
+  "*",
+  cors({
+    origin: (origin) => {
+      if (!origin) return config.corsOrigins[0] || "*";
+      if (config.corsOrigins.includes("*") || config.corsOrigins.includes(origin)) {
+        return origin;
+      }
+      return config.corsOrigins[0] || origin;
+    },
+    credentials: true,
+  })
+);
 app.use("*", logger());
 
 // ── auth helpers ─────────────────────────────────────────────────────────────
@@ -677,10 +689,21 @@ app.post("/api/wallet/deposit-toman", requireUser, async (c) => {
     walletId = wallet.id;
   } else {
     const r = await pool.query(
-      `INSERT INTO wallets (user_id, owner, asset, network, balance) VALUES ($1, $1, 'IRT', 'CARD', 0) RETURNING id`,
+      `INSERT INTO wallets (user_id, owner, asset, network, balance)
+       VALUES ($1, $1, 'IRT', 'CARD', 0)
+       ON CONFLICT DO NOTHING
+       RETURNING id`,
       [u.id]
     );
-    walletId = r.rows[0].id;
+    if (r.rows[0]) {
+      walletId = r.rows[0].id;
+    } else {
+      const existing = await one<Row>(
+        "SELECT id FROM wallets WHERE user_id = $1 AND asset = 'IRT' ORDER BY created_at ASC LIMIT 1",
+        [u.id]
+      );
+      walletId = existing?.id ?? u.id;
+    }
   }
   await pool.query(
     `INSERT INTO wallet_transactions (wallet_id, user_id, type, asset, amount, network, status, ref, note)
@@ -3218,6 +3241,17 @@ app.notFound((c) => c.json({ error: "مسیر یافت نشد." }, 404));
 // Bootstrap: HTTP + WebSocket + engine loop coordination
 // ─────────────────────────────────────────────────────────────────────────────
 export function startServer(): void {
+  // Check for default insecure secrets in environment and issue startup warnings
+  const missingSecrets: string[] = [];
+  if (!process.env.APP_SECRET || config.appSecret.includes("dev-secret")) missingSecrets.push("APP_SECRET");
+  if (!process.env.ENCRYPTION_KEY || config.encryptionKey.includes("dev-enc-key")) missingSecrets.push("ENCRYPTION_KEY");
+  if (!process.env.TELEGRAM_WEBHOOK_SECRET || config.telegram.webhookSecret.includes("wolf-secret")) missingSecrets.push("TELEGRAM_WEBHOOK_SECRET");
+  if (!process.env.ADMIN_PASSWORD) missingSecrets.push("ADMIN_PASSWORD");
+
+  if (missingSecrets.length > 0) {
+    console.warn(`[SECURITY WARNING] The following production secrets are using default or empty values: ${missingSecrets.join(", ")}. Please configure them in your .env file.`);
+  }
+
   // Ensure default admin user is always admin and enabled
   pool.query(`
     UPDATE users SET is_admin = true, is_assistant = false, role = 'admin', enabled = true, can_trade = true

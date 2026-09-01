@@ -62,13 +62,23 @@ export async function hashPassword(
   return { salt: bytesToHex(salt), hash: bytesToHex(bits) };
 }
 
+export function constantTimeEqual(a: string, b: string): boolean {
+  if (typeof a !== "string" || typeof b !== "string") return false;
+  if (a.length !== b.length) return false;
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
+}
+
 export async function verifyPassword(
   password: string,
   saltHex: string,
   expectedHash: string,
 ): Promise<boolean> {
   const { hash } = await PASSWORD_HASH(password, saltHex);
-  return hash === expectedHash;
+  return constantTimeEqual(hash, expectedHash);
 }
 
 async function PASSWORD_HASH(password: string, saltHex: string) {

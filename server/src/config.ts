@@ -45,7 +45,10 @@ export const config = {
 
   appSecret: str("APP_SECRET", "dev-secret-change-me"),
   encryptionKey: str("ENCRYPTION_KEY", str("APP_SECRET", "dev-enc-key-change-me")),
-  corsOrigins: str("CORS_ORIGINS", "*").split(",").map((s) => s.trim()),
+  corsOrigins: str("CORS_ORIGINS", str("APP_URL", "http://localhost:3001"))
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean),
 
   telegram: {
     token: str("TELEGRAM_BOT_TOKEN"),
