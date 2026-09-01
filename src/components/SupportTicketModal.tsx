@@ -1,3 +1,4 @@
+function asArr<T = any>(v: any): T[] { return Array.isArray(v) ? v : []; }
 import React, { useState } from "react";
 import { Headphones, MessageSquare, Send, Plus, CheckCircle2, Clock, Bot, Sparkles, ExternalLink } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
@@ -202,7 +203,7 @@ export function SupportTicketModal({
                 </Button>
               </div>
             ) : (
-              tickets.map((t) => (
+              asArr(tickets).map((t) => (
                 <div
                   key={t.id}
                   className="flex items-center justify-between rounded-xl border border-border/60 bg-background/50 p-3 text-xs hover:bg-background/80 transition-all"

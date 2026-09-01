@@ -1,3 +1,4 @@
+function asArr<T = any>(v: any): T[] { return Array.isArray(v) ? v : []; }
 import { useEffect, useRef, useState } from "react";
 import { CandlestickSeries, createChart, HistogramSeries, LineSeries, IChartApi, ISeriesApi, CandlestickData, LineData } from "lightweight-charts";
 
@@ -165,7 +166,7 @@ export function LiveChart({
           const res = await fetch(`${BINANCE_REST}?symbol=${sym}&interval=${tf}&limit=220`);
           if (!res.ok) throw new Error("bad status");
           const rows: any[] = await res.json();
-          list = rows.map((r) => ({
+          list = asArr(rows).map((r) => ({
             t: Number(r[0]),
             o: Number(r[1]),
             h: Number(r[2]),
@@ -311,7 +312,7 @@ export function LiveChart({
 
   useEffect(() => {
     if (!seriesRef.current || !chartRef.current) return;
-    const data: CandlestickData[] = candles.map((c) => ({
+    const data: CandlestickData[] = asArr(candles).map((c) => ({
       time: Math.floor(c.t / 1000) as any,
       open: c.o, high: c.h, low: c.l, close: c.c,
     }));

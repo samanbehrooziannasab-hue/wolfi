@@ -1146,40 +1146,64 @@ app.get("/api/monitor/stats", requireAdmin, async (c) => {
 
 // ── ADMIN: complete workspace data (read-only staff view) ───────────────────
 app.get("/api/admin/workspace", requireStaff, async (c) => {
-  const [users, positions, closed, orders, strategies, performance, exchanges, providers, vipPackages, vipRequests, learning, education, referrals, transactions, telegram, auditRows, markets] = await Promise.all([
-    many(`SELECT id, username, name,
+  const safeMany = (sql: string, params?: any[]) => many(sql, params).catch((err) => {
+    console.error(`[workspace query error]`, err.message);
+    return [];
+  });
+
+  const [
+    users,
+    positions,
+    closed,
+    orders,
+    strategies,
+    performance,
+    exchanges,
+    providers,
+    vipPackages,
+    vipRequests,
+    learning,
+    education,
+    referrals,
+    transactions,
+    telegram,
+    auditRows,
+    markets,
+  ] = await Promise.all([
+    safeMany(`SELECT id, username, name,
             CASE WHEN is_admin OR role = 'admin' OR LOWER(COALESCE(username, '')) = 'wolfadmin' THEN 'admin'
                  WHEN is_assistant OR role = 'assistant' THEN 'assistant' ELSE COALESCE(role, 'user') END AS role,
             (is_admin OR role = 'admin' OR LOWER(COALESCE(username, '')) = 'wolfadmin') AS is_admin,
             ((NOT (is_admin OR role = 'admin' OR LOWER(COALESCE(username, '')) = 'wolfadmin')) AND (is_assistant OR role = 'assistant')) AS is_assistant,
             is_vip, vip_package, vip_expires_at, enabled, can_trade, tg_id, tg_username, phone, language, theme, registered_at, last_activity, wallet_address
        FROM users ORDER BY created_at DESC LIMIT 500`),
-    many("SELECT * FROM open_positions ORDER BY open_time DESC"),
-    many("SELECT * FROM closed_positions ORDER BY close_time DESC LIMIT 300"),
-    many("SELECT * FROM orders ORDER BY created_at DESC LIMIT 300"),
-    many("SELECT * FROM strategies ORDER BY category, key"),
-    many("SELECT symbol, name_en, name_fa, market, base, quote, digits, type, last_price, last_price_24h, change_24h, priority, enabled, updated_at FROM markets ORDER BY market, priority"),
-    many("SELECT * FROM strategy_performance ORDER BY total_pnl DESC"),
-    many("SELECT id, name, provider, environment, enabled, status, last_test, last_error, balance, account_id FROM exchange_accounts ORDER BY created_at DESC"),
-    many("SELECT id, provider, model, base_url, priority, enabled, purpose, rate_limit, daily_limit, used_today, usage_errors, usage_latency_ms, last_used_at FROM ai_providers ORDER BY priority"),
-    many("SELECT * FROM vip_packages ORDER BY price"),
-    many("SELECT * FROM vip_requests ORDER BY created_at DESC LIMIT 300"),
-    many("SELECT * FROM learning_history ORDER BY created_at DESC LIMIT 300"),
-    many("SELECT id, title_fa, title_en, body_fa, body_en, source, status, day, created_by, decided_by, decided_at, note, sent_fa_at, sent_en_at, created_at FROM education ORDER BY created_at DESC LIMIT 100"),
-    many("SELECT r.*, ru.username AS referrer, du.username AS referred_user FROM referrals r LEFT JOIN users ru ON ru.id = r.referrer_id LEFT JOIN users du ON du.id = r.referred_id ORDER BY r.created_at DESC LIMIT 300"),
-    many("SELECT wt.*, u.username FROM wallet_transactions wt LEFT JOIN users u ON u.id = wt.user_id ORDER BY wt.created_at DESC LIMIT 300"),
-    many("SELECT * FROM telegram_messages ORDER BY created_at DESC LIMIT 200"),
-    many("SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 300"),
+    safeMany("SELECT * FROM open_positions ORDER BY open_time DESC"),
+    safeMany("SELECT * FROM closed_positions ORDER BY close_time DESC LIMIT 300"),
+    safeMany("SELECT * FROM orders ORDER BY created_at DESC LIMIT 300"),
+    safeMany("SELECT * FROM strategies ORDER BY category, key"),
+    safeMany("SELECT * FROM strategy_performance ORDER BY total_pnl DESC"),
+    safeMany("SELECT id, name, provider, environment, enabled, status, last_test, last_error, balance, account_id FROM exchange_accounts ORDER BY created_at DESC"),
+    safeMany("SELECT id, provider, model, base_url, priority, enabled, purpose, rate_limit, daily_limit, used_today, usage_errors, usage_latency_ms, last_used_at FROM ai_providers ORDER BY priority"),
+    safeMany("SELECT * FROM vip_packages ORDER BY price"),
+    safeMany("SELECT * FROM vip_requests ORDER BY created_at DESC LIMIT 300"),
+    safeMany("SELECT * FROM learning_history ORDER BY created_at DESC LIMIT 300"),
+    safeMany("SELECT id, title_fa, title_en, body_fa, body_en, source, status, day, created_by, decided_by, decided_at, note, sent_fa_at, sent_en_at, created_at FROM education ORDER BY created_at DESC LIMIT 100"),
+    safeMany("SELECT r.*, ru.username AS referrer, du.username AS referred_user FROM referrals r LEFT JOIN users ru ON ru.id = r.referrer_id LEFT JOIN users du ON du.id = r.referred_id ORDER BY r.created_at DESC LIMIT 300"),
+    safeMany("SELECT wt.*, u.username FROM wallet_transactions wt LEFT JOIN users u ON u.id = wt.user_id ORDER BY wt.created_at DESC LIMIT 300"),
+    safeMany("SELECT * FROM telegram_messages ORDER BY created_at DESC LIMIT 200"),
+    safeMany("SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 300"),
+    safeMany("SELECT symbol, name_en, name_fa, market, base, quote, digits, type, last_price, prev_close, change_24h, priority, enabled, updated_at FROM markets ORDER BY market, priority"),
   ]);
-  const settings = await getSettings();
+
+  const settings = await getSettings().catch(() => ({}));
   const safeSettings: Record<string, unknown> = { ...settings };
   for (const key of ["telegram.token", "telegram.webhookSecret", "ai.key", "ai.key2"]) {
     if (key in safeSettings) safeSettings[key] = mask(String(safeSettings[key] ?? ""));
   }
   const engine = {
-    heartbeat: await getEngineState("heartbeat"),
-    status: await getEngineState("status"),
-    lastScan: await getEngineState("last_scan"),
+    heartbeat: await getEngineState("heartbeat").catch(() => null),
+    status: await getEngineState("status").catch(() => null),
+    lastScan: await getEngineState("last_scan").catch(() => null),
     mode: (settings as any)["engine.mode"],
     capital: (settings as any)["engine.virtualCapital"],
     intervalSec: (settings as any)["engine.scanIntervalSec"],

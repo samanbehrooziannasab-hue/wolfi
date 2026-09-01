@@ -1,3 +1,4 @@
+function asArr<T = any>(v: any): T[] { return Array.isArray(v) ? v : []; }
 import { useId } from "react";
 
 type Props = {
@@ -37,7 +38,7 @@ export function SparkChart({
   const pad = 4;
   const innerH = height - pad * 2;
 
-  const pts = data.map((v, i) => {
+  const pts = asArr(data).map((v, i) => {
     const x = (i / (data.length - 1)) * width;
     const y = pad + innerH - ((v - min) / span) * innerH;
     return [x, y] as const;

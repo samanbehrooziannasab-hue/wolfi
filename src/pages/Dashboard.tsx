@@ -1,3 +1,4 @@
+function asArr<T = any>(v: any): T[] { return Array.isArray(v) ? v : []; }
 import { api } from "@/convex/_generated/api";
 import { formatSymbol as fmtSym } from "@/lib/format";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -1283,7 +1284,7 @@ function PositionCard({ p, lang, onClose, onSendTg }: { p: any; lang: Lang; onCl
         )}
         {p.strategyKeys?.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
-            {p.strategyKeys.map((k: string) => (
+            {asArr(p?.strategyKeys).map((k: string) => (
               <span key={k} className="terminal-font rounded bg-emerald-400/10 px-1.5 py-0.5 text-[10px] text-emerald-300">{k}</span>
             ))}
           </div>
@@ -1336,7 +1337,7 @@ function PositionCard({ p, lang, onClose, onSendTg }: { p: any; lang: Lang; onCl
             {p.targets?.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1.5">
                 <span className="text-[10px] text-muted-foreground">{s.targets}:</span>
-                {p.targets.map((t: number, i: number) => (
+                {asArr(p?.targets).map((t: number, i: number) => (
                   <span key={i} className="terminal-font rounded bg-emerald-400/10 px-1.5 py-0.5 text-[10px] text-emerald-300" dir="ltr">{num(t, 5)}</span>
                 ))}
               </div>
@@ -1358,9 +1359,9 @@ function MiniCandles({ data, overlays }: { data?: any[]; overlays?: Array<{ labe
   const w = 560;
   const h = 120;
   const pad = 6;
-  const highs = data.map((c) => c.h ?? c.c);
-  const lows = data.map((c) => c.l ?? c.o);
-  for (const o of overlays ?? []) for (const v of (o.values ?? [])) if (Number.isFinite(v)) highs.push(v);
+  const highs = asArr(data).map((c) => c.h ?? c.c);
+  const lows = asArr(data).map((c) => c.l ?? c.o);
+  for (const o of overlays ?? []) for (const v of asArr(o.values)) if (Number.isFinite(v)) highs.push(v);
   const max = Math.max(...highs);
   const min = Math.min(...lows);
   const span = max - min || 1;
@@ -1369,7 +1370,7 @@ function MiniCandles({ data, overlays }: { data?: any[]; overlays?: Array<{ labe
   const xAt = (i: number) => i * bw + bw / 2;
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="w-full" style={{ direction: "ltr" }}>
-      {data.map((c: any, i: number) => {
+      {asArr(data).map((c: any, i: number) => {
         const x = xAt(i);
         const up = (c.c ?? 0) >= (c.o ?? 0);
         const color = up ? "#34d399" : "#f87171";
@@ -1382,8 +1383,8 @@ function MiniCandles({ data, overlays }: { data?: any[]; overlays?: Array<{ labe
           </g>
         );
       })}
-      {(overlays ?? []).map((o) => {
-        const pts = (o.values ?? [])
+      {asArr(overlays).map((o) => {
+        const pts = asArr(o.values)
           .map((v, i) => (Number.isFinite(v) ? `${xAt(i).toFixed(1)},${y(v).toFixed(1)}` : null))
           .filter(Boolean)
           .join(" ");
@@ -1620,37 +1621,37 @@ function UserDetailCard({ token, userId, lang, onClose, readOnly = false }: { to
           <div className="rounded-md border border-border/50 bg-background/40 p-3">
             <p className="mb-2 text-xs font-bold">{s.transactions}</p>
             <div className="max-h-40 space-y-1 overflow-auto">
-              {(detail?.transactions ?? []).map((t: any) => (
+              {asArr(detail?.transactions).map((t: any) => (
                 <div key={t.id} className="flex items-center justify-between gap-2 text-[11px]">
                   <span className="truncate">{t.type} · {t.asset}</span>
                   <span className={`terminal-font tabular-nums ${t.status === "confirmed" ? "text-emerald-300" : t.status === "failed" ? "text-red-300" : "text-amber-300"}`} dir="ltr">{num(t.amount)}</span>
                 </div>
               ))}
-              {(detail?.transactions ?? []).length === 0 && <p className="py-3 text-center text-muted-foreground">{s.misc.none}</p>}
+              {asArr(detail?.transactions).length === 0 && <p className="py-3 text-center text-muted-foreground">{s.misc.none}</p>}
             </div>
           </div>
           <div className="rounded-md border border-border/50 bg-background/40 p-3">
             <p className="mb-2 text-xs font-bold">{s.coinLedger}</p>
             <div className="max-h-40 space-y-1 overflow-auto">
-              {(detail?.coinTransactions ?? []).map((t: any) => (
+              {asArr(detail?.coinTransactions).map((t: any) => (
                 <div key={t.id} className="flex items-center justify-between gap-2 text-[11px]">
                   <span className="truncate">{reasonFa(t.reason, lang)}</span>
                   <span className={`terminal-font tabular-nums ${(t.delta ?? 0) >= 0 ? "text-emerald-300" : "text-red-300"}`} dir="ltr">{(t.delta ?? 0) >= 0 ? "+" : ""}{num(t.delta)}</span>
                 </div>
               ))}
-              {(detail?.coinTransactions ?? []).length === 0 && <p className="py-3 text-center text-muted-foreground">{s.misc.none}</p>}
+              {asArr(detail?.coinTransactions).length === 0 && <p className="py-3 text-center text-muted-foreground">{s.misc.none}</p>}
             </div>
           </div>
           <div className="rounded-md border border-border/50 bg-background/40 p-3">
             <p className="mb-2 text-xs font-bold">{s.activity}</p>
             <div className="max-h-40 space-y-1 overflow-auto">
-              {(detail?.auditLogs ?? []).map((l: any) => (
+              {asArr(detail?.auditLogs).map((l: any) => (
                 <div key={l.id} className="flex items-center justify-between gap-2 text-[11px]">
                   <span className="truncate" dir="ltr">{l.action}</span>
                   <span className="shrink-0 text-[10px] text-muted-foreground">{timeAgo(l.created, lang)}</span>
                 </div>
               ))}
-              {(detail?.auditLogs ?? []).length === 0 && <p className="py-3 text-center text-muted-foreground">{s.misc.none}</p>}
+              {asArr(detail?.auditLogs).length === 0 && <p className="py-3 text-center text-muted-foreground">{s.misc.none}</p>}
             </div>
           </div>
         </div>
@@ -1662,7 +1663,7 @@ function UserDetailCard({ token, userId, lang, onClose, readOnly = false }: { to
 const NETWORKS = ["TRC20", "ERC20", "BEP20", "POLYGON", "SOL", "TON"];
 
 function eduStratLabel(key: string, list: any[] | undefined, lang: Lang): string {
-  const st = (list ?? []).find((x: any) => x.key === key);
+  const st = asArr(list).find((x: any) => x.key === key);
   if (!st) return key;
   return lang === "fa" ? st.nameFa ?? st.name ?? key : st.name ?? key;
 }
@@ -1940,7 +1941,7 @@ function UserPanel({ token }: { token: string }) {
 
   // unified transaction feed: USDT wallet + toman/wolf ledgers
   const allTx = useMemo(() => {
-    const w = (account?.transactions ?? []).map((t: any) => ({
+    const w = asArr(account?.transactions).map((t: any) => ({
       key: "w" + t.id,
       created: t.created,
       currency: t.asset ?? "USDT",
@@ -1951,7 +1952,7 @@ function UserPanel({ token }: { token: string }) {
       note: t.note,
       txid: t.txid,
     }));
-    const c = (coins?.transactions ?? []).map((t: any) => ({
+    const c = asArr(coins?.transactions).map((t: any) => ({
       key: "c" + t.id,
       created: t.created,
       currency: t.currency === "toman" ? "IRT" : "WOLF",
@@ -2059,7 +2060,7 @@ function UserPanel({ token }: { token: string }) {
   // source text through the AI chain for proofreading / improvement / summary.
   // Source = current input, else the last completed AI answer.
   const doWritingTool = async (kind: "proofread" | "improve" | "summarize") => {
-    const last = (myChats ?? []).find((c: any) => c.status === "done" && c.text);
+    const last = asArr(myChats).find((c: any) => c.status === "done" && c.text);
     const src = (aiQ.trim() || String(last?.text ?? "")).trim();
     if (!src || aiPending) {
       return toast.error(lang === "fa" ? "ابتدا متنی بنویسید یا از آخرین پاسخ هوش مصنوعی استفاده کنید" : "Write some text first or use the last AI answer");
@@ -2603,11 +2604,11 @@ function UserPanel({ token }: { token: string }) {
                   </Button>
                 </div>
               )}
-              {(predictions ?? []).length > 0 && (
+              {asArr(predictions).length > 0 && (
                 <div>
                   <p className="mb-1.5 text-[11px] font-bold text-muted-foreground">{s.predictionHistory}</p>
                   <div className="max-h-40 space-y-1 overflow-auto">
-                    {(predictions ?? []).map((p: any) => (
+                    {asArr(predictions).map((p: any) => (
                       <div key={p.id} className="flex items-center justify-between gap-2 rounded-md border border-border/40 bg-background/30 px-2.5 py-1.5 text-[11px]">
                         <span className="terminal-font font-semibold" dir="ltr">{fmtSym(p.symbol)} · {p.direction ?? "—"}</span>
                         <span className={p.status === "won" ? "text-emerald-300" : p.status === "lost" ? "text-red-300" : "text-muted-foreground"}>
@@ -2686,7 +2687,7 @@ function UserPanel({ token }: { token: string }) {
                   </div>
                   <p className="text-sm font-bold leading-relaxed">{lang === "fa" ? activeQuiz.question : activeQuiz.questionEn}</p>
                   <div className="space-y-2 pt-1">
-                    {activeQuiz.options.map((opt: string, i: number) => (
+                    {asArr(activeQuiz?.options).map((opt: string, i: number) => (
                       <button
                         key={i}
                         className={`w-full rounded-md border p-3 text-xs text-start transition-all font-medium ${
@@ -2750,7 +2751,7 @@ function UserPanel({ token }: { token: string }) {
                 <Button size="sm" variant="outline" className="h-6 gap-1 text-[10px]" disabled={aiPending} onClick={() => doWritingTool("summarize")}><FileText className="size-3" /> {lang === "fa" ? "خلاصه" : "Summarize"}</Button>
               </div>
               <div className="max-h-56 space-y-1.5 overflow-auto">
-                {(myChats ?? []).slice(0, 20).map((c: any) => (
+                {asArr(myChats).slice(0, 20).map((c: any) => (
                   <div key={c.id} className={`rounded-md border p-2 text-[11px] ${c.status === "error" ? "border-red-400/30 bg-red-400/5" : "border-border/50 bg-background/40"}`}>
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-cyan-300">🐺 WOLF AI</span>
@@ -2772,7 +2773,7 @@ function UserPanel({ token }: { token: string }) {
                     <p className="mt-1 whitespace-pre-wrap text-muted-foreground">{c.status === "error" ? (c.error ?? s.misc.none) : c.text || "…"}</p>
                   </div>
                 ))}
-                {(myChats ?? []).length === 0 && <p className="py-6 text-center text-muted-foreground">{s.misc.none}</p>}
+                {asArr(myChats).length === 0 && <p className="py-6 text-center text-muted-foreground">{s.misc.none}</p>}
               </div>
             </CardContent>
           </Card>
@@ -2789,7 +2790,7 @@ function UserPanel({ token }: { token: string }) {
                 <Select value={eduStrat} onValueChange={setEduStrat}>
                   <SelectTrigger className="w-56"><SelectValue placeholder={lang === "fa" ? "انتخاب استراتژی…" : "Select a strategy…"} /></SelectTrigger>
                   <SelectContent>
-                    {(userStrategies ?? []).map((st: any) => <SelectItem key={st.key} value={st.key}>{lang === "fa" ? st.nameFa : st.name}</SelectItem>)}
+                    {asArr(userStrategies).map((st: any) => <SelectItem key={st.key} value={st.key}>{lang === "fa" ? st.nameFa : st.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Button size="sm" variant="outline" className="gap-1.5 border-cyan-400/30 text-cyan-300" disabled={!eduStrat} onClick={() => { setTab("fun"); setAiQ(lang === "fa" ? `استراتژی «${eduStratLabel(eduStrat, userStrategies, lang)}» را به زبان ساده آموزش بده: شرایط ورود، خروج، حد ضرر و خطاهای رایج` : `Teach me the "${eduStratLabel(eduStrat, userStrategies, lang)}" strategy in plain words: entry rules, exit rules, stop loss and common mistakes`); toast.success(s.aiAdvisor); }}>
@@ -2797,7 +2798,7 @@ function UserPanel({ token }: { token: string }) {
                 </Button>
               </div>
               {eduStrat && (() => {
-                const st = (userStrategies ?? []).find((x: any) => x.key === eduStrat);
+                const st = asArr(userStrategies).find((x: any) => x.key === eduStrat);
                 if (!st) return null;
                 return (
                   <div className="rounded-md border border-border/50 bg-background/40 p-3 text-xs">
@@ -2949,7 +2950,7 @@ function UserPanel({ token }: { token: string }) {
                 <CardDescription>{s.renew}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
-                {(Array.isArray(packages) ? packages : (packages?.packages ?? [])).filter((p: any) => p?.status !== false).map((pkg: any) => (
+                {(Array.isArray(packages) ? packages : asArr(packages?.packages)).filter((p: any) => p?.status !== false).map((pkg: any) => (
                   <div key={pkg.key} className="rounded-lg border border-gold/25 bg-gradient-to-br from-gold/5 to-transparent p-4 space-y-2">
                     <div className="flex items-center gap-2">
                       <Crown className="size-5 text-gold" />
@@ -3000,11 +3001,11 @@ function UserPanel({ token }: { token: string }) {
                 <Input dir="ltr" placeholder={s.referralCode} className="h-8 text-xs" value={refCode} onChange={(e) => setRefCode(e.target.value)} />
                 <Button size="sm" className="h-8 shrink-0" onClick={doRef}>{s.submit}</Button>
               </div>
-              {referral && (referral.referredUsers ?? []).length > 0 ? (
+              {referral && asArr(referral.referredUsers).length > 0 ? (
                 <div className="rounded-md border border-border/50 bg-background/40 p-2.5">
                   <p className="text-[11px] font-bold text-muted-foreground">{s.referralUsers} ({referral.referredUsers.length})</p>
                   <div className="mt-1.5 max-h-40 space-y-1 overflow-auto">
-                    {referral.referredUsers.map((u: any, i: number) => (
+                    {asArr(referral?.referredUsers).map((u: any, i: number) => (
                       <div key={i} className="flex items-center justify-between gap-2 rounded border border-border/40 bg-background/30 px-2 py-1 text-[11px]">
                         <span className="font-semibold" dir="ltr">@{u.username || "—"}</span>
                         <span className="truncate text-muted-foreground">{u.name || ""}</span>
@@ -3072,7 +3073,7 @@ function UserPanel({ token }: { token: string }) {
                 <Button size="sm" className="w-full" onClick={doTicket}>{s.newTicket}</Button>
               </div>
               <div className="max-h-80 space-y-2 overflow-auto">
-                {(myTickets ?? []).slice(0, 8).map((t: any) => {
+                {asArr(myTickets).slice(0, 8).map((t: any) => {
                   const open = openTicket === t._id;
                   return (
                     <div key={t._id} className="rounded-md border border-border/50 bg-background/40 text-xs">
@@ -3089,7 +3090,7 @@ function UserPanel({ token }: { token: string }) {
                       {open && (
                         <div className="border-t border-border/40 px-2.5 py-2">
                           <div className="mb-2 max-h-48 space-y-1 overflow-auto">
-                            {(t.messages ?? []).map((m: any) => (
+                            {asArr(t.messages).map((m: any) => (
                               <div key={m._id} className={`rounded-md p-1.5 ${m.fromAdmin ? "border border-emerald-400/25 bg-emerald-400/5" : "border border-border/40 bg-background/50"}`}>
                                 <p className={`text-[10px] font-bold ${m.fromAdmin ? "text-emerald-300" : "text-muted-foreground"}`}>{m.fromAdmin ? (lang === "fa" ? "پشتیبانی" : "Support") : (lang === "fa" ? "شما" : "You")} · {timeAgo(m.created, lang)}</p>
                                 <p className="mt-0.5 break-words">{m.text}</p>
@@ -3108,7 +3109,7 @@ function UserPanel({ token }: { token: string }) {
                     </div>
                   );
                 })}
-                {(myTickets ?? []).length === 0 && <p className="py-3 text-center text-muted-foreground">{s.misc.none}</p>}
+                {asArr(myTickets).length === 0 && <p className="py-3 text-center text-muted-foreground">{s.misc.none}</p>}
               </div>
             </CardContent>
           </Card>
@@ -3455,7 +3456,7 @@ function UserPanel({ token }: { token: string }) {
                     </span>
                   </div>
                   <div className="space-y-1.5 pt-1">
-                    {(coins?.settings?.packages ?? []).map((pk: any, i: number) => {
+                    {asArr(coins?.settings?.packages).map((pk: any, i: number) => {
                       const usdtCost = ((pk.price ?? 0) / (tomanRate || 95000)).toFixed(2);
                       return (
                         <div key={i} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/50 bg-background/40 px-2.5 py-2 text-xs">
@@ -3602,18 +3603,18 @@ function UserPanel({ token }: { token: string }) {
               <CardTitle className="flex items-center justify-between text-sm">
                 <span className="flex items-center gap-1.5"><Activity className="size-4 text-emerald-300" /> {s.positionsOpen}</span>
                 <span className="rounded-full bg-emerald-400/10 px-2 py-0.5 text-[10px] font-bold text-emerald-300 border border-emerald-400/20" dir="ltr">
-                  {(positions ?? []).length} {lang === "fa" ? "پوزیشن فعال" : "Active"}
+                  {asArr(positions).length} {lang === "fa" ? "پوزیشن فعال" : "Active"}
                 </span>
               </CardTitle>
               <CardDescription>{s.positionsEmpty}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
-              {(positions ?? []).length === 0 && (
+              {asArr(positions).length === 0 && (
                 <p className="py-4 text-center text-xs text-muted-foreground">
                   {lang === "fa" ? "در حال حاضر پوزیشن بازی وجود ندارد — موتور به صورت ۲۴ ساعته در حال اسکن بازار است." : "No open positions — engine is scanning the market 24/7."}
                 </p>
               )}
-              {(positions ?? []).slice(0, 15).map((p: any) => (
+              {asArr(positions).slice(0, 15).map((p: any) => (
                 <div key={p.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/50 bg-background/40 px-3 py-2 text-xs">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className={`terminal-font font-bold ${p.side === "long" ? "text-emerald-300" : "text-red-300"}`} dir="ltr">{p.side === "long" ? "▲" : "▼"} {fmtSym(p.symbol)}</span>
@@ -3639,7 +3640,7 @@ function UserPanel({ token }: { token: string }) {
                 <CardDescription>{lang === "fa" ? `آخرین سیگنال‌های شناسایی‌شده — باز کردن جزئیات کامل ${coins?.settings?.signalDetail ?? 10} سکه هزینه دارد.` : `Latest signals — full detail view costs ${coins?.settings?.signalDetail ?? 10} wolf coins.`}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
-                {(signals ?? []).slice(0, 8).map((sg: any) => (
+                {asArr(signals).slice(0, 8).map((sg: any) => (
                   <div key={sg.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/50 bg-background/40 px-3 py-2 text-xs">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="terminal-font font-bold" dir="ltr">{fmtSym(sg.symbol)}</span>
@@ -3654,7 +3655,7 @@ function UserPanel({ token }: { token: string }) {
                     </div>
                   </div>
                 ))}
-                {(signals ?? []).length === 0 && <p className="py-4 text-center text-muted-foreground">{lang === "fa" ? "هنوز سیگنالی ثبت نشده — موتور در حال اسکن بازار است." : "No signals yet — the engine is scanning the market."}</p>}
+                {asArr(signals).length === 0 && <p className="py-4 text-center text-muted-foreground">{lang === "fa" ? "هنوز سیگنالی ثبت نشده — موتور در حال اسکن بازار است." : "No signals yet — the engine is scanning the market."}</p>}
                 {sigDetail ? (
                   <div className="rounded-md border border-emerald-400/25 bg-emerald-400/5 p-3 text-xs">
                     <p className="flex flex-wrap items-center gap-2 font-bold">
@@ -3668,10 +3669,10 @@ function UserPanel({ token }: { token: string }) {
                       <p><span className="text-muted-foreground">SL: </span><span className="terminal-font font-bold text-red-300" dir="ltr">{num(sigDetail.stopLoss, 5)}</span></p>
                       <p><span className="text-muted-foreground">TP: </span><span className="terminal-font font-bold text-emerald-300" dir="ltr">{num(sigDetail.takeProfit, 5)}</span></p>
                     </div>
-                    {(sigDetail.targets ?? []).length > 0 && <p className="mt-1.5"><span className="text-muted-foreground">{lang === "fa" ? "تارگت‌ها" : "Targets"}: </span><span className="terminal-font" dir="ltr">{sigDetail.targets.map((x: number) => num(x, 5)).join(" · ")}</span></p>}
-                    <p className="mt-1.5"><span className="text-muted-foreground">{lang === "fa" ? "استراتژی‌ها" : "Strategies"}: </span><span dir="ltr">{(sigDetail.strategyKeys ?? []).join(", ") || "—"}</span></p>
+                    {asArr(sigDetail.targets).length > 0 && <p className="mt-1.5"><span className="text-muted-foreground">{lang === "fa" ? "تارگت‌ها" : "Targets"}: </span><span className="terminal-font" dir="ltr">{sigDetail.targets.map((x: number) => num(x, 5)).join(" · ")}</span></p>}
+                    <p className="mt-1.5"><span className="text-muted-foreground">{lang === "fa" ? "استراتژی‌ها" : "Strategies"}: </span><span dir="ltr">{asArr(sigDetail.strategyKeys).join(", ") || "—"}</span></p>
                     <div className="mt-1.5 space-y-0.5">
-                      {(sigDetail.reasonsFa ?? []).slice(0, 4).map((r: string, i: number) => <p key={i} className="text-muted-foreground">• {r}</p>)}
+                      {asArr(sigDetail.reasonsFa).slice(0, 4).map((r: string, i: number) => <p key={i} className="text-muted-foreground">• {r}</p>)}
                     </div>
                     <div className="mt-2 overflow-hidden rounded-md border border-border/50">
                       <LiveChart
@@ -3709,7 +3710,7 @@ function UserPanel({ token }: { token: string }) {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {(markets ?? []).slice(0, 24).map((m: any) => {
+                    {asArr(markets).slice(0, 24).map((m: any) => {
                       const up = (m.change24h ?? 0) >= 0;
                       return (
                         <TableRow key={m.symbol} className="cursor-pointer hover:bg-muted/40 transition-colors" onClick={() => setChartSym(chartSym === m.symbol ? null : m.symbol)}>
@@ -3757,7 +3758,7 @@ function UserPanel({ token }: { token: string }) {
                 </div>
                 {(() => {
                   const targetSym = chartSym || "BTCUSDT";
-                  const openPos = (positions ?? []).find((p: any) => p.symbol === targetSym);
+                  const openPos = asArr(positions).find((p: any) => p.symbol === targetSym);
                   return openPos ? (
                     <div className="mb-2 flex flex-wrap items-center gap-2 rounded-md border border-gold/30 bg-gold/5 px-2.5 py-1.5 text-[11px]">
                       <span className={`font-bold ${openPos.side === "long" ? "text-emerald-300" : "text-red-300"}`} dir="ltr">{openPos.side === "long" ? "▲ LONG" : "▼ SHORT"}</span>
@@ -3773,9 +3774,9 @@ function UserPanel({ token }: { token: string }) {
                   symbol={chartSym || "BTCUSDT"}
                   timeframe={chartTf}
                   className="w-full"
-                  entry={(() => { const p = (positions ?? []).find((x: any) => x.symbol === (chartSym || "BTCUSDT")); return p?.entry; })()}
-                  stopLoss={(() => { const p = (positions ?? []).find((x: any) => x.symbol === (chartSym || "BTCUSDT")); return p?.stopLoss; })()}
-                  takeProfit={(() => { const p = (positions ?? []).find((x: any) => x.symbol === (chartSym || "BTCUSDT")); return p?.takeProfit; })()}
+                  entry={(() => { const p = asArr(positions).find((x: any) => x.symbol === (chartSym || "BTCUSDT")); return p?.entry; })()}
+                  stopLoss={(() => { const p = asArr(positions).find((x: any) => x.symbol === (chartSym || "BTCUSDT")); return p?.stopLoss; })()}
+                  takeProfit={(() => { const p = asArr(positions).find((x: any) => x.symbol === (chartSym || "BTCUSDT")); return p?.takeProfit; })()}
                 />
               </CardContent>
             </Card>
@@ -3783,7 +3784,7 @@ function UserPanel({ token }: { token: string }) {
 
           {/* ── Fundamental News Section ──────────────────────────────── */}
           <section>
-            <FundamentalNewsSection news={Array.isArray(fundamentalNews) ? fundamentalNews : (fundamentalNews?.news ?? [])} lang={lang} />
+            <FundamentalNewsSection news={Array.isArray(fundamentalNews) ? fundamentalNews : asArr(fundamentalNews?.news)} lang={lang} />
           </section>
 
           {/* ── positions ──────────────────────────────────────────────── */}
@@ -3791,7 +3792,7 @@ function UserPanel({ token }: { token: string }) {
             <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-muted-foreground"><Zap className="size-4 text-emerald-400" /> {s.positions}</h2>
             {positions && positions.length > 0 ? (
               <div className="grid gap-4 lg:grid-cols-2">
-                {positions.map((p: any) => <PositionCard key={p.id} p={p} lang={lang} />)}
+                {asArr(positions).map((p: any) => <PositionCard key={p.id} p={p} lang={lang} />)}
               </div>
             ) : (
               <Card className="border-border/60 bg-card/40"><CardContent className="p-8 text-center text-sm text-muted-foreground">{s.positionsEmpty}</CardContent></Card>
@@ -4259,7 +4260,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
   const doChartImage = async () => {
     setChartImgBusy(true);
     try {
-      const sig = (allSignals ?? []).filter((s: any) => s.symbol === candleSymbol)[0];
+      const sig = asArr(allSignals).filter((s: any) => s.symbol === candleSymbol)[0];
       const r: any = await chartImageFor({
         token,
         symbol: candleSymbol,
@@ -5192,7 +5193,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
           <Card className="border-border/70 bg-card/60">
             <CardHeader className="pb-2"><CardTitle className="text-sm">{s.signals}</CardTitle></CardHeader>
             <CardContent className="space-y-2">
-              {(overview?.signals.recent ?? []).map((sig: any, i: number) => (
+              {asArr(overview?.signals.recent).map((sig: any, i: number) => (
                 <div key={i} className="flex items-center justify-between rounded-md border border-border/50 bg-background/40 px-3 py-2 text-xs">
                   <span className="terminal-font font-bold" dir="ltr">{fmtSym(sig.symbol)}</span>
                   <Side side={sig.direction} />
@@ -5200,13 +5201,13 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
                 {sig.created && <span className="text-[10px] text-muted-foreground" dir="ltr">⏰ {new Date(sig.created).toLocaleTimeString(lang === "fa" ? "fa-IR" : "en-US", { hour: "2-digit", minute: "2-digit" })}</span>}
                 </div>
               ))}
-              {(overview?.signals.recent ?? []).length === 0 && <p className="py-6 text-center text-muted-foreground">{s.misc.none}</p>}
+              {asArr(overview?.signals.recent).length === 0 && <p className="py-6 text-center text-muted-foreground">{s.misc.none}</p>}
             </CardContent>
           </Card>
           <Card className="border-border/70 bg-card/60">
             <CardHeader className="pb-2"><CardTitle className="text-sm">{s.logs}</CardTitle></CardHeader>
             <CardContent className="max-h-64 space-y-1.5 overflow-auto">
-              {(overview?.logs ?? []).map((l: any, i: number) => (
+              {asArr(overview?.logs).map((l: any, i: number) => (
                 <div key={i} className="flex items-start gap-2 text-xs">
                   <LevelPill level={l.level} />
                   <span className="text-muted-foreground">{logFa(String(l.message ?? ""), lang)}</span>
@@ -5221,7 +5222,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
       <TabsContent value="positions" className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-bold text-muted-foreground">{s.positionsOpen} ({positions?.length ?? 0})</h2>
-          <Button size="sm" variant="outline" className="border-emerald-400/30 text-emerald-300" disabled={readOnly || (positions ?? []).length === 0} onClick={async () => {
+          <Button size="sm" variant="outline" className="border-emerald-400/30 text-emerald-300" disabled={readOnly || asArr(positions).length === 0} onClick={async () => {
             try {
               let sent = 0;
               for (const p of positions ?? []) {
@@ -5238,8 +5239,8 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
         </div>
         {positions && positions.length > 0 ? (
           <div className="grid gap-4 lg:grid-cols-2">
-            {positions.map((p: any) => (
-              <PositionCard key={p.id} p={p} lang={lang} onClose={readOnly ? undefined : (id) => closePosition({ token, positionId: id }).catch((e: any) => toast.error(String(e?.message)))} onSendTg={readOnly ? undefined : (id) => sendPositionToTelegram({ token, positionId: id }).then((r: any) => toast.success(lang === "fa" ? `کارت کامل + چارت به کانال‌ها ارسال شد ✓ (${(r?.sent ?? []).join("/")})` : `Full card + chart sent ✓ (${(r?.sent ?? []).join("/")})`)).catch((e: any) => toast.error(String(e?.message)))} />
+            {asArr(positions).map((p: any) => (
+              <PositionCard key={p.id} p={p} lang={lang} onClose={readOnly ? undefined : (id) => closePosition({ token, positionId: id }).catch((e: any) => toast.error(String(e?.message)))} onSendTg={readOnly ? undefined : (id) => sendPositionToTelegram({ token, positionId: id }).then((r: any) => toast.success(lang === "fa" ? `کارت کامل + چارت به کانال‌ها ارسال شد ✓ (${asArr(r?.sent).join("/")})` : `Full card + chart sent ✓ (${asArr(r?.sent).join("/")})`)).catch((e: any) => toast.error(String(e?.message)))} />
             ))}
           </div>
         ) : (
@@ -5260,16 +5261,16 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(closedPositions ?? []).map((cp: any) => (
+                {asArr(closedPositions).map((cp: any) => (
                   <TableRow key={cp.id}>
                     <TableCell className="terminal-font text-xs font-semibold" dir="ltr">{fmtSym(cp.symbol)}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{(cp.strategyKeys ?? []).slice(0, 2).join(", ") || "—"}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{asArr(cp.strategyKeys).slice(0, 2).join(", ") || "—"}</TableCell>
                     <TableCell className={`terminal-font text-xs tabular-nums ${(cp.pnl ?? 0) >= 0 ? "text-emerald-300" : "text-red-300"}`} dir="ltr">{pnlText(cp.pnl)}</TableCell>
                     <TableCell className="text-xs">{cp.closeReason ?? "—"}</TableCell>
                     <TableCell className="text-[10px] text-muted-foreground">{timeAgo(cp.closeTime, lang)}</TableCell>
                   </TableRow>
                 ))}
-                {(closedPositions ?? []).length === 0 && <TableRow><TableCell colSpan={5} className="py-6 text-center text-muted-foreground">{s.misc.none}</TableCell></TableRow>}
+                {asArr(closedPositions).length === 0 && <TableRow><TableCell colSpan={5} className="py-6 text-center text-muted-foreground">{s.misc.none}</TableCell></TableRow>}
               </TableBody>
             </Table>
           </CardContent>
@@ -5281,7 +5282,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
             <CardDescription>{lang === "fa" ? "سیگنال‌های باز موتور — برای مشاهده جزئیات روی هر ردیف کلیک کنید" : "Open engine signals — click a row to expand details"}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
-            {(allSignals ?? []).slice(0, 15).map((sg: any) => {
+            {asArr(allSignals).slice(0, 15).map((sg: any) => {
               const open = expSignal === sg.id;
               return (
                 <div key={sg.id} className="rounded-md border border-border/50 bg-background/40">
@@ -5296,10 +5297,10 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
                       <div className="rounded-md border border-border/40 bg-background/40 p-2"><p className="text-[10px] text-muted-foreground">Entry</p><p className="terminal-font" dir="ltr">{sg.entry}</p></div>
                       <div className="rounded-md border border-border/40 bg-background/40 p-2"><p className="text-[10px] text-muted-foreground">Stop loss</p><p className="terminal-font text-red-300" dir="ltr">{sg.stopLoss}</p></div>
                       <div className="rounded-md border border-border/40 bg-background/40 p-2"><p className="text-[10px] text-muted-foreground">Take profit</p><p className="terminal-font text-emerald-300" dir="ltr">{sg.takeProfit}</p></div>
-                      {(sg.targets ?? []).length > 1 && (
+                      {asArr(sg.targets).length > 1 && (
                         <div className="rounded-md border border-border/40 bg-background/40 p-2 sm:col-span-3">
                           <p className="text-[10px] text-muted-foreground">Targets</p>
-                          <p className="terminal-font" dir="ltr">{(sg.targets ?? []).join(" · ")}</p>
+                          <p className="terminal-font" dir="ltr">{asArr(sg.targets).join(" · ")}</p>
                         </div>
                       )}
                       <div className="flex flex-wrap items-center gap-1.5 sm:col-span-3">
@@ -5316,7 +5317,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
                 </div>
               );
             })}
-            {(allSignals ?? []).length === 0 && <p className="py-6 text-center text-muted-foreground">{s.misc.none}</p>}
+            {asArr(allSignals).length === 0 && <p className="py-6 text-center text-muted-foreground">{s.misc.none}</p>}
           </CardContent>
         </Card>
       </TabsContent>
@@ -5352,11 +5353,11 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
           </CardHeader>
           <CardContent className="space-y-2">
             <Input dir="auto" placeholder={lang === "fa" ? "مثلاً: marij، 0912..." : "e.g. marij, 0912..."} value={userQ} onChange={(e) => setUserQ(e.target.value)} />
-            {userQ.trim().length >= 2 && (userSearchRes ?? []).length === 0 && (
+            {userQ.trim().length >= 2 && asArr(userSearchRes).length === 0 && (
               <p className="py-2 text-center text-[11px] text-muted-foreground">{lang === "fa" ? "کاربری پیدا نشد" : "No user found"}</p>
             )}
             <div className="max-h-56 space-y-1 overflow-auto">
-              {(userSearchRes ?? []).map((u: any) => (
+              {asArr(userSearchRes).map((u: any) => (
                 <div key={u.id} className="flex flex-wrap items-center gap-2 rounded-md border border-border/50 bg-background/40 px-3 py-2 text-xs">
                   <button type="button" className="terminal-font font-bold text-cyan-300 hover:underline" onClick={() => setDetailUser(u.id)}>{u.username ?? `TG${u.tgId ?? ""}`}</button>
                   <span className="text-muted-foreground">{u.name ?? u.tgUsername ?? "—"}</span>
@@ -5382,7 +5383,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(users ?? []).map((u: any) => (
+                {asArr(users).map((u: any) => (
                   <TableRow key={u.id}>
                     <TableCell className="text-xs font-semibold" dir="ltr">
                       <button type="button" className="rounded border border-emerald-400/25 px-1.5 py-0.5 text-emerald-300 transition-colors hover:bg-emerald-400/10" onClick={() => setDetailUser(u.id)}>{u.username ?? `TG${u.tgId ?? ""}`}</button>
@@ -5401,7 +5402,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
                 ))}
               </TableBody>
             </Table>
-            {(users ?? []).length === 0 && <p className="p-6 text-center text-muted-foreground">{s.emptyUsers}</p>}
+            {asArr(users).length === 0 && <p className="p-6 text-center text-muted-foreground">{s.emptyUsers}</p>}
           </CardContent>
         </Card>
       </TabsContent>
@@ -5431,14 +5432,14 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
               <Button onClick={doAddAddress}>{s.addAddress}</Button>
             </div>
             <div className="space-y-2">
-              {(walletAddresses ?? []).map((a: any) => (
+              {asArr(walletAddresses).map((a: any) => (
                 <div key={a.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/50 bg-background/40 px-3 py-2 text-xs">
                   <span className="font-bold">{a.network} · {a.asset} <Badge variant="outline" className={`ms-1 text-[9px] ${a.kind === "withdraw" ? "text-cyan-300" : "text-emerald-300"}`}>{a.kind === "withdraw" ? (lang === "fa" ? "برداشت" : "Withdraw") : (lang === "fa" ? "واریز" : "Deposit")}</Badge></span>
                   <span className="terminal-font flex-1 break-all text-muted-foreground" dir="ltr">{a.address}</span>
                   <Button size="sm" variant="outline" className="h-7 px-2 text-[11px] text-red-300" onClick={() => removeWalletAddress({ token, id: a.id })}>{s.reject}</Button>
                 </div>
               ))}
-              {(walletAddresses ?? []).length === 0 && <p className="py-4 text-center text-muted-foreground">{s.misc.none}</p>}
+              {asArr(walletAddresses).length === 0 && <p className="py-4 text-center text-muted-foreground">{s.misc.none}</p>}
             </div>
           </CardContent>
         </Card>
@@ -5461,7 +5462,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(transactions ?? []).map((t: any) => (
+                {asArr(transactions).map((t: any) => (
                   <TableRow key={t.id} className="align-top">
                     <TableCell className="text-xs font-semibold">
                       {t.user?.username ? <button type="button" className="rounded border border-emerald-400/25 px-1.5 py-0.5 text-emerald-300 hover:bg-emerald-400/10" onClick={() => setDetailUser(t.user.id)} dir="ltr">@{t.user.username}</button> : <span className="text-muted-foreground">—</span>}
@@ -5497,7 +5498,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
               </TableBody>
             </Table>
             </div>
-            {(transactions ?? []).length === 0 && <p className="p-6 text-center text-muted-foreground">{s.emptyTx}</p>}
+            {asArr(transactions).length === 0 && <p className="p-6 text-center text-muted-foreground">{s.emptyTx}</p>}
           </CardContent>
         </Card>
 
@@ -5516,7 +5517,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(coinLedger ?? []).map((l: any) => (
+                {asArr(coinLedger).map((l: any) => (
                   <TableRow key={l.id}>
                     <TableCell className="text-xs font-semibold" dir="ltr">{l.user}</TableCell>
                     <TableCell className={`terminal-font text-xs tabular-nums ${l.currency === "toman" ? "text-gold" : "text-cyan-300"}`} dir="ltr">{l.currency} · {(l.delta ?? 0) >= 0 ? "+" : ""}{num(l.delta)}</TableCell>
@@ -5524,7 +5525,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
                     <TableCell className="text-[10px] text-muted-foreground">{timeAgo(l.created, lang)}</TableCell>
                   </TableRow>
                 ))}
-                {(coinLedger ?? []).length === 0 && <TableRow><TableCell colSpan={4} className="py-6 text-center text-muted-foreground">{s.misc.none}</TableCell></TableRow>}
+                {asArr(coinLedger).length === 0 && <TableRow><TableCell colSpan={4} className="py-6 text-center text-muted-foreground">{s.misc.none}</TableCell></TableRow>}
               </TableBody>
             </Table>
           </CardContent>
@@ -5535,7 +5536,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
         <Card className="border-border/70 bg-card/60">
           <CardHeader className="pb-2"><CardTitle className="text-sm">{s.requests}</CardTitle></CardHeader>
           <CardContent className="space-y-2">
-            {(vipRequests ?? []).map((r: any) => (
+            {asArr(vipRequests).map((r: any) => (
               <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/50 bg-background/40 px-3 py-2 text-xs">
                 <span className="font-bold" dir="ltr">{r.userName}</span>
                 <span>{r.packageKey}</span>
@@ -5546,12 +5547,12 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
                 </div>
               </div>
             ))}
-            {(vipRequests ?? []).length === 0 && <p className="py-4 text-center text-muted-foreground">{s.emptyReq}</p>}
+            {asArr(vipRequests).length === 0 && <p className="py-4 text-center text-muted-foreground">{s.emptyReq}</p>}
           </CardContent>
         </Card>
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {(packages ?? []).map((pkg: any) => {
+          {asArr(packages).map((pkg: any) => {
             const editing = pkgEdit === pkg.key;
             return (
               <Card key={pkg.key} className="border-border/70 bg-card/60">
@@ -5565,7 +5566,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
                       <p className="text-xs text-muted-foreground">{pkg.durationDays} {s.misc.days} · {s.capital}: ${pkg.minCapital}–${pkg.maxCapital}</p>
                       {pkg.discountPercent > 0 && <p className="text-[11px] text-emerald-300">{s.discount}: {pkg.discountPercent}%</p>}
                       {pkg.giftCoins > 0 && <p className="text-[11px] text-cyan-300">{s.giftCoins}: {pkg.giftCoins}</p>}
-                      <Button size="sm" variant="outline" className="w-full border-gold/30 text-gold" onClick={() => { setPkgEdit(pkg.key); setPkgForm({ name: pkg.name ?? "", nameFa: pkg.nameFa ?? "", price: pkg.price ?? 0, durationDays: pkg.durationDays ?? 30, minCapital: pkg.minCapital ?? 0, maxCapital: pkg.maxCapital ?? 100, features: (pkg.features ?? []).join("\n"), featuresFa: (pkg.featuresFa ?? []).join("\n"), riskDisclosure: pkg.riskDisclosure ?? "", terms: pkg.terms ?? "", status: pkg.status !== false, discountPercent: pkg.discountPercent ?? 0, giftCoins: pkg.giftCoins ?? 0, commissionPct: pkg.commissionPct ?? 1 }); }}>{s.editPackage}</Button>
+                      <Button size="sm" variant="outline" className="w-full border-gold/30 text-gold" onClick={() => { setPkgEdit(pkg.key); setPkgForm({ name: pkg.name ?? "", nameFa: pkg.nameFa ?? "", price: pkg.price ?? 0, durationDays: pkg.durationDays ?? 30, minCapital: pkg.minCapital ?? 0, maxCapital: pkg.maxCapital ?? 100, features: asArr(pkg.features).join("\n"), featuresFa: asArr(pkg.featuresFa).join("\n"), riskDisclosure: pkg.riskDisclosure ?? "", terms: pkg.terms ?? "", status: pkg.status !== false, discountPercent: pkg.discountPercent ?? 0, giftCoins: pkg.giftCoins ?? 0, commissionPct: pkg.commissionPct ?? 1 }); }}>{s.editPackage}</Button>
                     </>
                   ) : (
                     <>
@@ -5623,7 +5624,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
               <Button onClick={doAddExchange}>{s.addExchange}</Button>
             </div>
             <div className="space-y-2">
-              {(exchanges ?? []).map((x: any) => (
+              {asArr(exchanges).map((x: any) => (
                 <div key={x.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/50 bg-background/40 px-3 py-2 text-xs">
                   <span className="font-bold">{x.name}</span>
                   <Badge variant="outline" className="text-[10px]">{x.provider} · {x.environment}</Badge>
@@ -5636,11 +5637,11 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
                   <Button size="sm" variant="outline" className="h-7 gap-1 px-2 text-[11px] border-cyan-400/30 text-cyan-300" onClick={async () => { setExTest((t) => ({ ...t, [x.id]: { busy: true } })); try { const r: any = await testBroker({ token, accountId: x.id }); setExTest((t) => ({ ...t, [x.id]: r })); if (r?.ok) toast.success(`${x.provider} ✓`); else toast.error(String(r?.error ?? "failed")); } catch (e2: any) { setExTest((t) => ({ ...t, [x.id]: { ok: false, error: String(e2?.message ?? e2) } })); } }} disabled={exTest[x.id]?.busy}>
                     <Zap className="size-3" /> {lang === "fa" ? "تست" : "Test"}
                   </Button>
-                  {exTest[x.id]?.busy ? <Loader2 className="size-3.5 animate-spin text-cyan-300" /> : exTest[x.id]?.ok ? <span className="text-[10px] text-emerald-300">✓ {(exTest[x.id]?.balance ?? []).slice(0, 3).map((b: any) => `${b.currency}:${Number(b.total ?? b.balance ?? 0).toFixed(2)}`).join(" · ") || "ok"}</span> : exTest[x.id]?.error ? <span className="max-w-40 truncate text-[10px] text-red-300" title={String(exTest[x.id].error)}>{String(exTest[x.id].error).slice(0, 40)}</span> : null}
+                  {exTest[x.id]?.busy ? <Loader2 className="size-3.5 animate-spin text-cyan-300" /> : exTest[x.id]?.ok ? <span className="text-[10px] text-emerald-300">✓ {asArr(exTest[x.id]?.balance).slice(0, 3).map((b: any) => `${b.currency}:${Number(b.total ?? b.balance ?? 0).toFixed(2)}`).join(" · ") || "ok"}</span> : exTest[x.id]?.error ? <span className="max-w-40 truncate text-[10px] text-red-300" title={String(exTest[x.id].error)}>{String(exTest[x.id].error).slice(0, 40)}</span> : null}
                   <Button size="sm" variant="outline" className="h-7 px-2 text-[11px] text-red-300" onClick={() => removeExchange({ token, id: x.id })}>{s.reject}</Button>
                 </div>
               ))}
-              {(exchanges ?? []).length === 0 && <p className="py-4 text-center text-muted-foreground">{s.misc.none}</p>}
+              {asArr(exchanges).length === 0 && <p className="py-4 text-center text-muted-foreground">{s.misc.none}</p>}
             </div>
           </CardContent>
         </Card>
@@ -5663,10 +5664,10 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
                 <Badge variant="outline" className="text-emerald-300" dir="ltr">TP: {num(manualResult.takeProfit, 5)}</Badge>
                 <Badge variant="outline" className="text-amber-300" dir="ltr">{manualResult.leverage}x · {num(manualResult.size, 2)} USDT</Badge>
               </div>
-              {(manualResult.bestStrategies ?? []).length > 0 && (
+              {asArr(manualResult.bestStrategies).length > 0 && (
                 <div className="flex flex-wrap items-center gap-1.5">
                   <span className="text-[10px] text-muted-foreground">{s.btBestStrategies}:</span>
-                  {(manualResult.bestStrategies as string[]).map((st: string) => <span key={st} className="terminal-font rounded bg-emerald-400/10 px-1.5 py-0.5 text-[10px] text-emerald-300" dir="ltr">{st}</span>)}
+                  {asArr(manualResult?.bestStrategies).map((st: string) => <span key={st} className="terminal-font rounded bg-emerald-400/10 px-1.5 py-0.5 text-[10px] text-emerald-300" dir="ltr">{st}</span>)}
                 </div>
               )}
               {manualResult.warning ? <p className="text-[11px] text-amber-300">⚠️ {manualResult.warning}</p> : null}
@@ -5699,7 +5700,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(markets ?? []).filter((m: any) => mktFilter === "all" || m.market === mktFilter).map((m: any) => {
+                {asArr(markets).filter((m: any) => mktFilter === "all" || m.market === mktFilter).map((m: any) => {
                   const up = (m.change24h ?? 0) >= 0;
                   return (
                   <TableRow key={m.symbol} className={m.enabled === false ? "opacity-50" : ""}>
@@ -5762,7 +5763,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
             {candleData?.data?.length ? (
               <div className="rounded-md border border-border/50 bg-background/40 p-2">
                 <MiniCandles data={candleData.data} overlays={(() => {
-                  const closes = candleData.data.map((c: any) => c.c);
+                  const closes = asArr(candleData?.data).map((c: any) => c.c);
                   if (candleOverlay === "ema") {
                     return [
                       { label: "EMA9", color: "#22d3ee", values: emaSeries(closes, 9) },
@@ -5770,7 +5771,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
                     ];
                   }
                   if (candleOverlay === "signal") {
-                    const sig = (allSignals ?? []).filter((s: any) => s.symbol === candleSymbol)[0];
+                    const sig = asArr(allSignals).filter((s: any) => s.symbol === candleSymbol)[0];
                     if (sig && Number.isFinite(sig.entry)) {
                       const line = (v: number, color: string, label: string) => ({ label, color, values: closes.map(() => v) });
                       return [
@@ -5850,7 +5851,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
                     {lang === "fa" ? "پیش‌تنظیم فعال:" : "Active preset:"} {(() => {
                       const curIds = strategyPresets.current.split(",").map((s: string) => s.trim());
                       const names = curIds.map((cid: string) => {
-                        const cur = (strategyPresets?.presets ?? []).find((x: any) => x.id === cid);
+                        const cur = asArr(strategyPresets?.presets).find((x: any) => x.id === cid);
                         return cur ? (lang === "fa" ? cur.nameFa : cur.nameEn) : cid;
                       });
                       return names.join(" + ");
@@ -5896,7 +5897,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
               </div>
             </div>
             <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
-              {(strategyPresets?.presets ?? []).map((p: any) => {
+              {asArr(strategyPresets?.presets).map((p: any) => {
                 const isSelectedInMulti = selectedPresets.includes(p.id);
                 return (
                   <button
@@ -5960,7 +5961,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(strategies ?? []).map((st: any) => (
+                {asArr(strategies).map((st: any) => (
                   <TableRow key={st.key} className={st.enabled === false ? "opacity-50" : ""}>
                     <TableCell className="terminal-font text-xs font-semibold" dir="ltr">{st.key}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{lang === "fa" ? st.nameFa : st.name}</TableCell>
@@ -6009,7 +6010,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
         <Card className="border-border/70 bg-card/60">
           <CardHeader className="pb-2"><CardTitle className="text-sm">{s.notifications}</CardTitle></CardHeader>
           <CardContent className="max-h-[24rem] space-y-2 overflow-auto">
-            {(notifications ?? []).map((n: any) => (
+            {asArr(notifications).map((n: any) => (
               <div key={n.id} className="rounded-md border border-border/50 bg-background/40 p-2.5 text-xs">
                 <div className="flex items-center justify-between">
                   <span className="font-bold">{lang === "fa" ? n.titleFa : n.titleEn || n.titleFa}</span>
@@ -6019,7 +6020,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
                 <p className="terminal-font mt-1 text-[10px] text-muted-foreground">{timeAgo(n.created, lang)}</p>
               </div>
             ))}
-            {(notifications ?? []).length === 0 && <p className="py-6 text-center text-muted-foreground">{s.misc.none}</p>}
+            {asArr(notifications).length === 0 && <p className="py-6 text-center text-muted-foreground">{s.misc.none}</p>}
           </CardContent>
         </Card>
       </TabsContent>
@@ -6179,7 +6180,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
                 <Select value={btSymbol} onValueChange={setBtSymbol}>
                   <SelectTrigger className="w-36 h-8"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {(markets ?? []).map((m: any) => <SelectItem key={m.symbol} value={m.symbol}>{fmtSym(m.symbol)}</SelectItem>)}
+                    {asArr(markets).map((m: any) => <SelectItem key={m.symbol} value={m.symbol}>{fmtSym(m.symbol)}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -6382,7 +6383,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
               </Button>
               {tunerResult && (
                 <span className="text-[11px] text-muted-foreground">
-                  {lang === "fa" ? `${tunerResult.combos} ترکیب × ${tunerResult.windows} پنجره (${(tunerResult.symbols ?? []).join(", ")})` : `${tunerResult.combos} combos × ${tunerResult.windows} windows (${(tunerResult.symbols ?? []).join(", ")})`}
+                  {lang === "fa" ? `${tunerResult.combos} ترکیب × ${tunerResult.windows} پنجره (${asArr(tunerResult.symbols).join(", ")})` : `${tunerResult.combos} combos × ${tunerResult.windows} windows (${asArr(tunerResult.symbols).join(", ")})`}
                 </span>
               )}
             </div>
@@ -6450,7 +6451,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
             <CardDescription>{lang === "fa" ? "درس‌های ثبت‌شده موتور از معاملات (موفق/ناموفق + بازبینی هوش مصنوعی)" : "Engine lessons from closed trades (win/loss + AI review)"}</CardDescription>
           </CardHeader>
           <CardContent className="max-h-72 space-y-2 overflow-auto">
-            {(learning ?? []).slice(0, 60).map((l: any) => (
+            {asArr(learning).slice(0, 60).map((l: any) => (
               <div key={l.id} className="rounded-md border border-border/50 bg-background/40 p-2.5 text-xs">
                 <div className="flex flex-wrap items-center gap-1.5">
                   <span className="terminal-font font-bold" dir="ltr">{fmtSym(l.symbol)} · {l.timeframe}</span>
@@ -6460,7 +6461,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
                 <p className="mt-1 text-muted-foreground">{l.aiReview || l.decision || "—"}</p>
               </div>
             ))}
-            {(learning ?? []).length === 0 && <p className="py-8 text-center text-muted-foreground">{s.misc.none}</p>}
+            {asArr(learning).length === 0 && <p className="py-8 text-center text-muted-foreground">{s.misc.none}</p>}
           </CardContent>
         </Card>
 
@@ -6472,13 +6473,13 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
           <CardContent className="space-y-2">
             <div className="flex flex-wrap items-center gap-1.5">
               <Button size="sm" variant="outline" disabled={eduBusy} onClick={doEduGenerate}>{eduBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />} {lang === "fa" ? "تولید درس جدید (امروز)" : "Generate lesson (today)"}</Button>
-              <Button size="sm" variant={eduFilter === "pending" ? "default" : "outline"} onClick={() => setEduFilter("pending")}>{lang === "fa" ? "در انتظار" : "Pending"} ({(eduAll ?? []).filter((x: any) => x.status === "pending").length})</Button>
+              <Button size="sm" variant={eduFilter === "pending" ? "default" : "outline"} onClick={() => setEduFilter("pending")}>{lang === "fa" ? "در انتظار" : "Pending"} ({asArr(eduAll).filter((x: any) => x.status === "pending").length})</Button>
               <Button size="sm" variant={eduFilter === "approved" ? "default" : "outline"} onClick={() => setEduFilter("approved")}>{lang === "fa" ? "تأییدشده" : "Approved"}</Button>
               <Button size="sm" variant={eduFilter === "rejected" ? "default" : "outline"} onClick={() => setEduFilter("rejected")}>{lang === "fa" ? "ردشده" : "Rejected"}</Button>
               <Button size="sm" variant={eduFilter === "all" ? "default" : "outline"} onClick={() => setEduFilter("all")}>{lang === "fa" ? "همه" : "All"}</Button>
             </div>
             <div className="max-h-80 space-y-2 overflow-auto">
-              {(eduAll ?? []).filter((x: any) => eduFilter === "all" || x.status === eduFilter).slice(0, 40).map((e: any) => (
+              {asArr(eduAll).filter((x: any) => eduFilter === "all" || x.status === eduFilter).slice(0, 40).map((e: any) => (
                 <div key={e._id} className={`rounded-md border p-2.5 text-xs ${e.status === "pending" ? "border-amber-400/30 bg-amber-400/5" : e.status === "approved" ? "border-emerald-400/30 bg-emerald-400/5" : "border-red-400/20 bg-red-400/5"}`}>
                   <div className="flex flex-wrap items-center justify-between gap-1.5">
                     <span className="font-bold">{lang === "fa" ? e.titleFa : e.titleEn}</span>
@@ -6516,7 +6517,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
                   </div>
                 </div>
               ))}
-              {(eduAll ?? []).length === 0 && <p className="py-6 text-center text-muted-foreground">{s.misc.none}</p>}
+              {asArr(eduAll).length === 0 && <p className="py-6 text-center text-muted-foreground">{s.misc.none}</p>}
             </div>
           </CardContent>
         </Card>
@@ -6526,7 +6527,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
         <Card className="border-border/70 bg-card/60">
           <CardHeader className="pb-2"><CardTitle className="text-sm">{s.tickets}</CardTitle></CardHeader>
           <CardContent className="space-y-2">
-            {(allTickets ?? []).map((t: any) => {
+            {asArr(allTickets).map((t: any) => {
               const open = openTicket === t._id;
               return (
                 <div key={t._id} className="rounded-md border border-border/50 bg-background/40">
@@ -6535,12 +6536,12 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
                     <span className="text-sm font-bold">{t.subject}</span>
                     <Badge variant="outline" className="text-[10px]">{t.status}</Badge>
                     <span className="terminal-font text-[10px] text-muted-foreground" dir="ltr">{t.username ?? ""}</span>
-                    <span className="ms-auto text-[10px] text-muted-foreground">{timeAgo(t.created, lang)} · {(t.messages ?? []).length} {s.message}</span>
+                    <span className="ms-auto text-[10px] text-muted-foreground">{timeAgo(t.created, lang)} · {asArr(t.messages).length} {s.message}</span>
                   </button>
                   {open && (
                     <div className="border-t border-border/40 p-3">
                       <div className="mb-2 max-h-56 space-y-1.5 overflow-auto">
-                        {(t.messages ?? []).map((m: any) => (
+                        {asArr(t.messages).map((m: any) => (
                           <div key={m.id ?? m._id} className={`rounded-md p-2 text-xs ${m.fromAdmin ? "border border-emerald-400/25 bg-emerald-400/5" : "border border-border/50 bg-background/60"}`}>
                             <p className={m.fromAdmin ? "font-bold text-emerald-300" : "text-muted-foreground"}>
                               {m.fromAdmin ? (lang === "fa" ? "پاسخ مدیر" : "Admin") : (m.senderName ? <span dir="ltr" className="terminal-font">@{m.senderName}</span> : (lang === "fa" ? "کاربر" : "User"))}:
@@ -6574,7 +6575,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
                 </div>
               );
             })}
-            {(allTickets ?? []).length === 0 && <p className="py-8 text-center text-muted-foreground">{s.misc.none}</p>}
+            {asArr(allTickets).length === 0 && <p className="py-8 text-center text-muted-foreground">{s.misc.none}</p>}
           </CardContent>
         </Card>
       </TabsContent>
@@ -6594,7 +6595,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(referrals ?? []).map((r: any) => (
+                {asArr(referrals).map((r: any) => (
                   <TableRow key={r.id}>
                     <TableCell className="terminal-font text-xs font-semibold" dir="ltr">{r.code}</TableCell>
                     <TableCell className="text-xs" dir="ltr">{r.referrer ?? "—"}</TableCell>
@@ -6603,7 +6604,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
                     <TableCell className="text-xs">{r.rewardEnabled ? (lang === "fa" ? "فعال" : "ON") : (lang === "fa" ? "خاموش" : "OFF")}</TableCell>
                   </TableRow>
                 ))}
-                {(referrals ?? []).length === 0 && <TableRow><TableCell colSpan={5} className="py-8 text-center text-muted-foreground">{s.misc.none}</TableCell></TableRow>}
+                {asArr(referrals).length === 0 && <TableRow><TableCell colSpan={5} className="py-8 text-center text-muted-foreground">{s.misc.none}</TableCell></TableRow>}
               </TableBody>
             </Table>
           </CardContent>
@@ -6630,27 +6631,27 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
         <Card className="border-border/70 bg-card/60">
           <CardHeader className="pb-2"><CardTitle className="text-sm">{s.logs}</CardTitle></CardHeader>
           <CardContent className="max-h-[26rem] space-y-1.5 overflow-auto">
-            {(engineLogs ?? []).map((l: any) => (
+            {asArr(engineLogs).map((l: any) => (
               <div key={l._id} className="flex items-start gap-2 rounded-md border border-border/40 bg-background/30 px-2 py-1.5 text-xs">
                 <LevelPill level={l.level} />
                 <span className="text-muted-foreground">{logFa(String(l.message ?? ""), lang)}</span>
                 <span className="terminal-font ms-auto shrink-0 text-[10px] text-muted-foreground">{timeAgo(l.created, lang)}</span>
               </div>
             ))}
-            {(engineLogs ?? []).length === 0 && <p className="py-8 text-center text-muted-foreground">{s.misc.none}</p>}
+            {asArr(engineLogs).length === 0 && <p className="py-8 text-center text-muted-foreground">{s.misc.none}</p>}
           </CardContent>
         </Card>
         <Card className="border-border/70 bg-card/60">
           <CardHeader className="pb-2"><CardTitle className="text-sm"><ShieldCheck className="size-4 text-violet-300" /> {lang === "fa" ? "لاگ امنیتی (Audit)" : "Security audit log"}</CardTitle></CardHeader>
           <CardContent className="max-h-[26rem] space-y-1.5 overflow-auto">
-            {(auditLogs ?? []).map((l: any) => (
+            {asArr(auditLogs).map((l: any) => (
               <div key={l._id} className="flex items-start gap-2 rounded-md border border-border/40 bg-background/30 px-2 py-1.5 text-xs">
                 <LevelPill level="SECURITY" />
                 <span className="text-muted-foreground" dir="ltr">{String(l.action ?? "")}</span>
                 <span className="ms-auto shrink-0 text-[10px] text-muted-foreground">{l.actor ?? ""} · {timeAgo(l.created, lang)}</span>
               </div>
             ))}
-            {(auditLogs ?? []).length === 0 && <p className="py-8 text-center text-muted-foreground">{s.misc.none}</p>}
+            {asArr(auditLogs).length === 0 && <p className="py-8 text-center text-muted-foreground">{s.misc.none}</p>}
           </CardContent>
         </Card>
       </TabsContent>
@@ -6700,16 +6701,16 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
               </div>
             </div>
             <div className="max-h-56 space-y-1.5 overflow-auto">
-              {(vouchers ?? []).map((vc: any) => (
+              {asArr(vouchers).map((vc: any) => (
                 <div key={vc.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/50 bg-background/40 px-3 py-2 text-xs">
                   <span className="terminal-font font-bold" dir="ltr">{vc.code}</span>
                   <span className="tabular-nums text-cyan-300">+{vc.coins}</span>
                   <span className="text-muted-foreground">{vc.usedCount}/{vc.maxUses} {s.timesUsed}</span>
-                  <span className="text-[10px] text-muted-foreground">{(vc.lastUsers ?? []).join(", ") || "—"}</span>
+                  <span className="text-[10px] text-muted-foreground">{asArr(vc.lastUsers).join(", ") || "—"}</span>
                   <Switch checked={vc.status !== false} onCheckedChange={(v) => toggleVoucher({ token, id: vc.id, status: v }).catch(() => {})} />
                 </div>
               ))}
-              {(vouchers ?? []).length === 0 && <p className="py-4 text-center text-muted-foreground">{s.misc.none}</p>}
+              {asArr(vouchers).length === 0 && <p className="py-4 text-center text-muted-foreground">{s.misc.none}</p>}
             </div>
           </CardContent>
         </Card>
@@ -6755,7 +6756,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
               <Button size="sm" variant="destructive" className="h-6 gap-1 text-[10px]" disabled={aiClearBusy !== null} onClick={() => doClearAiHistory()}>{aiClearBusy === "all" ? <Loader2 className="size-3 animate-spin" /> : <Trash2 className="size-3" />} {lang === "fa" ? "پاک کردن همه" : "Clear everything"}</Button>
             </div>
             <div className="max-h-56 space-y-1.5 overflow-auto">
-              {(aiUsage?.recent ?? []).map((r: any) => (
+              {asArr(aiUsage?.recent).map((r: any) => (
                 <div key={r.id} className="rounded-md border border-border/40 bg-background/30 p-2 text-[11px]">
                   <div className="flex items-center justify-between gap-1">
                     <span className="terminal-font font-bold" dir="ltr">{r.kind} · {r.provider}</span>
@@ -6768,7 +6769,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
                   <p className="mt-1 line-clamp-2 text-muted-foreground">{r.text || r.error || "…"}</p>
                 </div>
               ))}
-              {(aiUsage?.recent ?? []).length === 0 && <p className="py-6 text-center text-muted-foreground">{s.misc.none}</p>}
+              {asArr(aiUsage?.recent).length === 0 && <p className="py-6 text-center text-muted-foreground">{s.misc.none}</p>}
             </div>
           </CardContent>
         </Card>
@@ -6779,9 +6780,9 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
             <CardDescription>{lang === "fa" ? "وضعیت زنده هر پروایدر: کلید تنظیم شده؟، کول‌داون/خطاها، آخرین موفقیت، تعداد درخواست‌ها و پشتیبانی از تصویر (vision). کلیدها فقط از تب Keys خوانده می‌شوند و هرگز نمایش داده نمی‌شوند." : "Live status per provider: key configured?, cooldown/errors, last success, request count and image (vision) support. Keys are read from the Keys tab and never displayed."}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
-            {(aiProviderHealth ?? []).length === 0 && <p className="py-3 text-center text-xs text-muted-foreground">{s.misc.none}</p>}
+            {asArr(aiProviderHealth).length === 0 && <p className="py-3 text-center text-xs text-muted-foreground">{s.misc.none}</p>}
             <div className="grid gap-1.5 sm:grid-cols-2">
-              {(aiProviderHealth ?? []).map((p: any) => {
+              {asArr(aiProviderHealth).map((p: any) => {
                 const ready = p.cooldownMs <= 0;
                 const usable = p.hasKey || p.kind === "keyless";
                 return (
@@ -6809,10 +6810,10 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
                 );
               })}
             </div>
-            {(aiProviderHealth ?? []).length > 0 && (
+            {asArr(aiProviderHealth).length > 0 && (
               <p className="text-[10px] text-muted-foreground">{lang === "fa"
-                ? `${(aiProviderHealth ?? []).filter((p: any) => p.hasKey || p.kind === "keyless").length} پروایدر قابل استفاده · ${(aiProviderHealth ?? []).filter((p: any) => p.vision).length} پروایدر دیداری (تصویر) · ${(aiProviderHealth ?? []).filter((p: any) => p.cooldownMs > 0).length} در کول‌داون`
-                : `${(aiProviderHealth ?? []).filter((p: any) => p.hasKey || p.kind === "keyless").length} usable · ${(aiProviderHealth ?? []).filter((p: any) => p.vision).length} vision · ${(aiProviderHealth ?? []).filter((p: any) => p.cooldownMs > 0).length} cooling down`}</p>
+                ? `${asArr(aiProviderHealth).filter((p: any) => p.hasKey || p.kind === "keyless").length} پروایدر قابل استفاده · ${asArr(aiProviderHealth).filter((p: any) => p.vision).length} پروایدر دیداری (تصویر) · ${asArr(aiProviderHealth).filter((p: any) => p.cooldownMs > 0).length} در کول‌داون`
+                : `${asArr(aiProviderHealth).filter((p: any) => p.hasKey || p.kind === "keyless").length} usable · ${asArr(aiProviderHealth).filter((p: any) => p.vision).length} vision · ${asArr(aiProviderHealth).filter((p: any) => p.cooldownMs > 0).length} cooling down`}</p>
             )}
           </CardContent>
         </Card>
@@ -6929,7 +6930,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
               <Button className="shrink-0 gap-1.5" disabled={adminAiPending} onClick={doAdminAsk}>{adminAiPending ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />} {lang === "fa" ? "بپرس" : "Ask"}</Button>
             </div>
             <div className="max-h-56 space-y-1.5 overflow-auto">
-              {(adminChats ?? []).slice(0, 20).map((c: any) => (
+              {asArr(adminChats).slice(0, 20).map((c: any) => (
                 <div key={c.id} className={`rounded-md border p-2 text-[11px] ${c.status === "error" ? "border-red-400/30 bg-red-400/5" : "border-border/50 bg-background/40"}`}>
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-cyan-300">🐺 WOLF AI</span>
@@ -6939,7 +6940,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
                   <p className="mt-1 whitespace-pre-wrap text-muted-foreground">{c.status === "error" ? (c.error ?? s.misc.none) : c.text || "…"}</p>
                 </div>
               ))}
-              {(adminChats ?? []).length === 0 && <p className="py-6 text-center text-muted-foreground">{s.misc.none}</p>}
+              {asArr(adminChats).length === 0 && <p className="py-6 text-center text-muted-foreground">{s.misc.none}</p>}
             </div>
           </CardContent>
         </Card>
@@ -6955,7 +6956,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
               <span className="text-[10px] leading-relaxed text-muted-foreground">{lang === "fa" ? "هوش مصنوعی بر اساس دانش بازار (لایه اینترنت) ۳ استراتژی جدید پیشنهاد می‌دهد — موتور قطعی هرگز در لحظه تغییر نمی‌کند." : "The AI proposes 3 new strategies from market knowledge (the internet layer) — the deterministic engine is never changed at runtime."}</span>
             </div>
             <div className="max-h-72 space-y-1.5 overflow-auto">
-              {(aiUsage?.recent ?? []).filter((r: any) => ["strategy_suggest", "post_entry", "learning_review"].includes(r.kind)).map((r: any) => (
+              {asArr(aiUsage?.recent).filter((r: any) => ["strategy_suggest", "post_entry", "learning_review"].includes(r.kind)).map((r: any) => (
                 <div key={r.id} className="rounded-md border border-border/40 bg-background/30 p-2 text-[11px]">
                   <div className="flex items-center justify-between">
                     <span className="terminal-font font-bold" dir="ltr">{r.kind} · {r.provider}</span>
@@ -6964,7 +6965,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
                   <p className="mt-1 line-clamp-4 whitespace-pre-wrap text-muted-foreground">{r.text || r.error || "…"}</p>
                 </div>
               ))}
-              {(aiUsage?.recent ?? []).filter((r: any) => ["strategy_suggest", "post_entry", "learning_review"].includes(r.kind)).length === 0 && <p className="py-4 text-center text-muted-foreground">{lang === "fa" ? "هنوز گزارشی نیست — بعد از اولین بازبینی پوزیشن یا تحقیق اینجا ظاهر می‌شود." : "No reports yet — appears after the first position review or research."}</p>}
+              {asArr(aiUsage?.recent).filter((r: any) => ["strategy_suggest", "post_entry", "learning_review"].includes(r.kind)).length === 0 && <p className="py-4 text-center text-muted-foreground">{lang === "fa" ? "هنوز گزارشی نیست — بعد از اولین بازبینی پوزیشن یا تحقیق اینجا ظاهر می‌شود." : "No reports yet — appears after the first position review or research."}</p>}
             </div>
           </CardContent>
         </Card>
@@ -6979,7 +6980,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
               <Button size="sm" variant="outline" disabled={eduBusy} onClick={doEduGenerate}>{eduBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />} {lang === "fa" ? "تولید درس امروز" : "Generate today's lesson"}</Button>
             </div>
             <div className="max-h-72 space-y-1.5 overflow-auto">
-              {(eduAll ?? []).filter((x: any) => x.status === "pending" || x.status === "approved").slice(0, 15).map((e: any) => (
+              {asArr(eduAll).filter((x: any) => x.status === "pending" || x.status === "approved").slice(0, 15).map((e: any) => (
                 <div key={e._id} className={`rounded-md border p-2 text-[11px] ${e.status === "pending" ? "border-amber-400/30 bg-amber-400/5" : "border-emerald-400/30 bg-emerald-400/5"}`}>
                   <div className="flex flex-wrap items-center justify-between gap-1">
                     <span className="font-bold">{lang === "fa" ? e.titleFa : e.titleEn}</span>
@@ -6999,7 +7000,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
                   )}
                 </div>
               ))}
-              {(eduAll ?? []).length === 0 && <p className="py-6 text-center text-muted-foreground">{s.misc.none}</p>}
+              {asArr(eduAll).length === 0 && <p className="py-6 text-center text-muted-foreground">{s.misc.none}</p>}
             </div>
           </CardContent>
         </Card>
@@ -7192,7 +7193,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
             ) : null}
             {tgChan ? (
               <div className="space-y-1">
-                {(tgChan?.results ?? []).map((r: any, i: number) => (
+                {asArr(tgChan?.results).map((r: any, i: number) => (
                   <p key={i} className={`rounded-md border p-2 text-[11px] ${r?.ok ? "border-emerald-400/30 bg-emerald-400/5 text-emerald-300" : "border-red-400/30 bg-red-400/5 text-red-300"}`}>
                     {r?.chatId}: {r?.ok ? "✓" : String(r?.reason ?? "")}
                   </p>
@@ -7347,25 +7348,25 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
                 <div className="rounded-md border border-border/50 bg-background/40 p-2.5">
                   <p className="mb-1.5 flex items-center gap-1 text-[11px] font-bold text-muted-foreground"><Wallet className="size-3" /> {lang === "fa" ? "موجودی" : "Balances"}</p>
                   <div className="space-y-1">
-                    {(swapwallet.balances ?? []).map((b: any) => (
+                    {asArr(swapwallet.balances).map((b: any) => (
                       <div key={b.token} className="flex items-center justify-between rounded border-b border-border/40 pb-1 text-[11px]">
                         <span className="font-bold">{b.token}</span>
                         <span className="terminal-font tabular-nums" dir="ltr">{Number(b.amount?.number ?? 0).toLocaleString("en-US", { maximumFractionDigits: 6 })} {b.amount?.unit ?? ""}</span>
                       </div>
                     ))}
-                    {(swapwallet.balances ?? []).length === 0 && <p className="text-[10px] text-muted-foreground">—</p>}
+                    {asArr(swapwallet.balances).length === 0 && <p className="text-[10px] text-muted-foreground">—</p>}
                   </div>
                 </div>
                 <div className="rounded-md border border-border/50 bg-background/40 p-2.5">
                   <p className="mb-1.5 flex items-center gap-1 text-[11px] font-bold text-muted-foreground"><Zap className="size-3" /> {lang === "fa" ? `قیمت‌های OTC (${swapwallet.priceCount})` : `OTC prices (${swapwallet.priceCount})`}</p>
                   <div className="space-y-1">
-                    {(swapwallet.prices ?? []).slice(0, 12).map((r: any) => (
+                    {asArr(swapwallet.prices).slice(0, 12).map((r: any) => (
                       <div key={r.pair} className="flex items-center justify-between rounded border-b border-border/40 pb-1 text-[11px]">
                         <span className="font-bold" dir="ltr">{r.pair}</span>
                         <span className="terminal-font tabular-nums" dir="ltr">{r.price.toLocaleString("en-US", { maximumFractionDigits: 8 })}</span>
                       </div>
                     ))}
-                    {(swapwallet.prices ?? []).length === 0 && <p className="text-[10px] text-muted-foreground">—</p>}
+                    {asArr(swapwallet.prices).length === 0 && <p className="text-[10px] text-muted-foreground">—</p>}
                   </div>
                 </div>
               </div>
@@ -7374,7 +7375,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
               <div className="rounded-md border border-border/50 bg-background/40 p-2.5">
                 <p className="mb-1.5 flex items-center gap-1 text-[11px] font-bold text-muted-foreground"><Layers className="size-3" /> {lang === "fa" ? "آخرین تراکنش‌ها" : "Recent transactions"}</p>
                 <div className="space-y-1">
-                  {(swapwallet.transactions ?? []).slice(0, 12).map((t: any) => {
+                  {asArr(swapwallet.transactions).slice(0, 12).map((t: any) => {
                     const detail = t.transfer ?? t.trade ?? t.cryptoDeposit ?? t.cryptoWithdraw ?? t.fiatDeposit ?? t.fiatWithdraw ?? t.payment ?? t.credit ?? null;
                     const amt = detail?.amount ?? detail?.sourceAmount ?? null;
                     return (
@@ -7674,22 +7675,22 @@ export default function Dashboard() {
               <span className={`size-1.5 rounded-full ${isOnline ? "bg-emerald-400 shadow-[0_0_6px_#34d399] animate-pulse-soft" : "bg-red-400"}`} />
               {isOnline ? s.engineOnline : s.engineOffline}
             </span>
-            <Popover open={notifOpen} onOpenChange={(o) => { setNotifOpen(o); if (o) { (myNotifs ?? []).forEach((n: any) => { if (!n.seen) void markNotifSeen({ token: token ?? "", id: n.id }).catch(() => undefined); }); } }}>
+            <Popover open={notifOpen} onOpenChange={(o) => { setNotifOpen(o); if (o) { asArr(myNotifs).forEach((n: any) => { if (!n.seen) void markNotifSeen({ token: token ?? "", id: n.id }).catch(() => undefined); }); } }}>
               <PopoverTrigger asChild>
                 <Button variant="outline" size="icon" className="relative size-8">
                   <Bell className="size-3.5" />
-                  {((myNotifs ?? []).filter((n: any) => !n.seen).length ?? 0) > 0 && (
-                    <span className="absolute -end-1 -top-1 flex size-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">{Math.min(9, (myNotifs ?? []).filter((n: any) => !n.seen).length)}</span>
+                  {(asArr(myNotifs).filter((n: any) => !n.seen).length ?? 0) > 0 && (
+                    <span className="absolute -end-1 -top-1 flex size-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">{Math.min(9, asArr(myNotifs).filter((n: any) => !n.seen).length)}</span>
                   )}
                 </Button>
               </PopoverTrigger>
               <PopoverContent align="end" className="w-80 p-0">
                 <div className="flex items-center justify-between border-b border-border/60 px-3 py-2">
                   <span className="text-xs font-bold">{s.notifications}</span>
-                  <span className="text-[10px] text-muted-foreground">{(myNotifs ?? []).filter((n: any) => !n.seen).length} {s.notifUnread}</span>
+                  <span className="text-[10px] text-muted-foreground">{asArr(myNotifs).filter((n: any) => !n.seen).length} {s.notifUnread}</span>
                 </div>
                 <div className="max-h-80 space-y-1.5 overflow-auto p-2">
-                  {(myNotifs ?? []).slice(0, 30).map((n: any) => (
+                  {asArr(myNotifs).slice(0, 30).map((n: any) => (
                     <div key={n.id} className={`rounded-md border p-2.5 text-xs ${n.seen ? "border-border/40 bg-background/40" : "border-emerald-400/30 bg-emerald-400/5"}`}>
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-bold">{lang === "fa" ? n.titleFa : n.titleEn || n.titleFa}</span>
@@ -7699,7 +7700,7 @@ export default function Dashboard() {
                       <p className="terminal-font mt-1 text-[9px] text-muted-foreground">{timeAgo(n.created, lang)}</p>
                     </div>
                   ))}
-                  {(myNotifs ?? []).length === 0 && <p className="py-8 text-center text-muted-foreground">{s.notifEmpty}</p>}
+                  {asArr(myNotifs).length === 0 && <p className="py-8 text-center text-muted-foreground">{s.notifEmpty}</p>}
                 </div>
               </PopoverContent>
             </Popover>

@@ -1,3 +1,4 @@
+function asArr<T = any>(v: any): T[] { return Array.isArray(v) ? v : []; }
 import React from "react";
 import { useQuery } from "@/lib/safeHooks";
 import { api } from "../convex/_generated/api";
@@ -30,7 +31,7 @@ export const LiveWinningTicker: React.FC<LiveWinningTickerProps> = ({ lang = "fa
 
         {/* Marquee Ticker Items */}
         <div className="flex flex-1 overflow-x-auto no-scrollbar gap-3 py-0.5 items-center">
-          {feed.map((w: any, idx: number) => {
+          {asArr(feed).map((w: any, idx: number) => {
             const isJackpot = w.profitUsd >= 400;
             return (
               <button

@@ -1,3 +1,4 @@
+function asArr<T = any>(v: any): T[] { return Array.isArray(v) ? v : []; }
 import { useState } from "react";
 import { useWolfAuth } from "@/hooks/use-wolf-auth";
 import { useQuery, useMutation } from "@/lib/safeHooks";
@@ -329,7 +330,7 @@ export function AdminManagementPanel({ className }: Props) {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {vipPackages.map((pkg: any) => (
+                        {asArr(vipPackages).map((pkg: any) => (
                           <TableRow key={pkg._id} className="border-slate-800/60">
                             <TableCell className="font-medium text-slate-200">
                               <div>{pkg.nameFa}</div>
@@ -620,7 +621,7 @@ export function AdminManagementPanel({ className }: Props) {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {userList.slice(0, 15).map((u: any) => (
+                    {asArr(userList).slice(0, 15).map((u: any) => (
                       <TableRow key={u._id} className="border-slate-800/60">
                         <TableCell className="font-medium text-slate-200">
                           <div>{u.name || u.username}</div>
@@ -856,7 +857,7 @@ export function AdminManagementPanel({ className }: Props) {
 
                     {/* Messages thread */}
                     <div className="max-h-60 overflow-auto space-y-2 bg-surface/40 p-3 rounded border border-slate-800/80">
-                      {(t.messages ?? []).map((m: any) => (
+                      {asArr(t.messages).map((m: any) => (
                         <div key={m.id || m._id} className={`max-w-[85%] rounded p-2 text-xs space-y-1 ${m.fromAdmin ? "ms-auto bg-emerald-950/30 border border-emerald-500/30 text-emerald-200" : "bg-surface border border-slate-700 text-slate-200"}`}>
                           <div className="flex items-center justify-between text-[10px] text-slate-400">
                             <span className="font-bold">{m.fromAdmin ? "پشتیبان (کادر فنی)" : `@${t.username || "کاربر"}`}</span>
