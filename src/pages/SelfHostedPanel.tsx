@@ -601,7 +601,23 @@ export default function SelfHostedPanel() {
 
   // ── engine controls ─────────────────────────────────────────────────────
   const engAction = async (a: string) => { setBusy(a); try { await restFetch(`/api/admin/${a}`, { method: "POST", token }); toast.success(s.saved); adminOv.reload(); } catch (e: any) { toast.error(String(e?.message)); } finally { setBusy(""); } };
-  const doStop = async (stop: boolean) => { setBusy("emg"); try { await restFetch("/api/admin/emergency/stop", { method: "POST", token, body: { stop } }); toast.success(s.saved); adminOv.reload(); } catch (e: any) { toast.error(String(e?.message)); } finally { setBusy(""); } };
+  const doStop = async (stop: boolean) => {
+    setBusy("emg");
+    try {
+      const res: any = await restFetch("/api/admin/emergency/stop", { method: "POST", token, body: { stop } });
+      await Promise.all([adminOv.reload(), adminWs.reload()]);
+      const isStopped = res?.emergencyStop ?? stop;
+      if (isStopped) {
+        toast.error(res?.message || (lang === "fa" ? "⚠️ توقف اضطراری فعال شد" : "⚠️ Emergency stop activated"));
+      } else {
+        toast.success(res?.message || (lang === "fa" ? "✅ توقف اضطراری لغو شد" : "✅ Emergency stop released"));
+      }
+    } catch (e: any) {
+      toast.error(String(e?.message ?? e));
+    } finally {
+      setBusy("");
+    }
+  };
   const doPause = async (pause: boolean) => { setBusy("pause"); try { await restFetch("/api/admin/emergency/pause", { method: "POST", token, body: { pause } }); toast.success(s.saved); adminOv.reload(); } catch (e: any) { toast.error(String(e?.message)); } finally { setBusy(""); } };
   const doCloseAll = async () => { setBusy("ca"); try { await restFetch("/api/admin/emergency/close-all", { method: "POST", token, body: { confirm: "CLOSE_ALL" } }); toast.success(s.saved); adminOv.reload(); } catch (e: any) { toast.error(String(e?.message)); } finally { setBusy(""); } };
 

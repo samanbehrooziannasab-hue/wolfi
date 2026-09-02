@@ -18,6 +18,7 @@ import { useCallback, useEffect, useState } from "react";
 import { joinApi } from "@/lib/backend";
 import { getFunctionName } from "convex/server";
 import { logApiError } from "@/lib/api-error-logger";
+import { toast } from "sonner";
 
 // ─── auth token ──────────────────────────────────────────────────────────────
 export function readAuthToken(): string {
@@ -292,6 +293,11 @@ const ROUTES: Record<string, Spec> = {
     },
   },
   "riskAdvisor:review": { m: "GET", p: "__memo__risk_advice" },
+  "me:me": { m: "GET", p: "/account", pick: (d) => d },
+  "users:currentUser": { m: "GET", p: "/account", pick: (d) => d },
+  "authHelpers:currentUser": { m: "GET", p: "/account", pick: (d) => d },
+  "tradingArena:getArenaAnalysis": { m: "GET", p: "/admin/strategies", pick: (d) => d },
+  "tradingArena:getLiveWinningFeed": { m: "GET", p: "/admin/positions", pick: (d) => d?.open ?? [] },
 };
 
 // Mark every list-shaped route so failed/forbidden reads degrade to []
@@ -305,10 +311,8 @@ for (const k of Object.keys(ROUTES)) {
 
 function routeFor(name: string): Spec {
   if (ROUTES[name]) return ROUTES[name];
-  // Sensible generic fallback so an unmapped member still resolves somewhere.
-  if (name.startsWith("swapwallet:")) return { m: "POST", p: "/admin/swapwallet/enabled", b: () => ({}) };
-  const isList = /(list|Search|Packages|Chats|Education|Learning|Logs|Tickets|Transactions|Users|Referrals|Addresses|Positions|Predictions|Vouchers|Signals|History|News|Queries)/i.test(name);
-  return { m: "GET", p: "/monitor/health", pick: (d) => (isList ? firstArray(d) : d), list: isList };
+  if (MUTATIONS[name]) return MUTATIONS[name];
+  throw new Error(`عملیات ${name} در سرور تعریف نشده است. (تابع نگاشت‌نشده)`);
 }
 
 function resolveSpec(spec: Spec, args: any): { method: string; path: string; body?: any } {
@@ -366,7 +370,7 @@ function bumpTags(tags: string[]) {
   for (const [, e] of store) if (e.tags.some((t) => tags.includes(t))) e.stale = true;
   listeners.forEach((l) => l());
 }
-const bumpAll = () => bumpTags(["*"]);
+export const bumpAll = () => bumpTags(["*"]);
 
 function keyOf(name: string, args: any): string {
   if (args === "skip") return "";
@@ -525,53 +529,58 @@ export function useRestMutation(reference: any): (args?: any) => Promise<any> {
   const name: string = getFunctionName(reference) ?? "";
   return useCallback(async (callArgs: any = {}) => {
     const cleanArgs = stripToken(callArgs);
-    // Interceptions for flows without direct HTTP equivalents:
-    if (name === "riskAdvisor:request") {
-      const res: any = await restCall("POST", joinApi("/admin/settings/ai-risk-advice"), {});
-      lastRiskAdvice = res?.text != null
-        ? { status: "done", text: String(res.text ?? res.summaryFa ?? "") }
-        : (res ?? { status: "done", text: "" });
-      for (const k of [...store.keys()]) if (k.startsWith("riskAdvisor:review|")) store.delete(k);
-      listeners.forEach((l) => l());
-      return { key: "advice" };
-    }
-    if (name === "nodeCalls:edgeTtsHealth") return { ok: false };
-    if (name === "nodeCalls:telegramGetWebhookInfo") {
-      try { return await restCall("GET", joinApi("/admin/telegram/webhook-info")); } catch (e: any) { return { ok: false, error: String(e?.message ?? "خطا در دریافت وضعیت وبهوک") }; }
-    }
-    if (name === "nodeCalls:telegramSetupWebhook") {
-      // Send the REAL bot token from the form field (never a masked placeholder)
-      // plus the public URL. Auth travels in the Authorization header instead.
-      const botTok = String(callArgs?.botToken ?? "").trim();
-      const pub = String(callArgs?.publicUrl ?? "").trim();
-      try {
+    try {
+      // Interceptions for flows without direct HTTP equivalents:
+      if (name === "riskAdvisor:request") {
+        const res: any = await restCall("POST", joinApi("/admin/settings/ai-risk-advice"), {});
+        lastRiskAdvice = res?.text != null
+          ? { status: "done", text: String(res.text ?? res.summaryFa ?? "") }
+          : (res ?? { status: "done", text: "" });
+        for (const k of [...store.keys()]) if (k.startsWith("riskAdvisor:review|")) store.delete(k);
+        listeners.forEach((l) => l());
+        return { key: "advice" };
+      }
+      if (name === "nodeCalls:edgeTtsHealth") return { ok: false };
+      if (name === "nodeCalls:telegramGetWebhookInfo") {
+        return await restCall("GET", joinApi("/admin/telegram/webhook-info"));
+      }
+      if (name === "nodeCalls:telegramSetupWebhook") {
+        const botTok = String(callArgs?.botToken ?? "").trim();
+        const pub = String(callArgs?.publicUrl ?? "").trim();
         return await restCall("POST", joinApi("/admin/telegram/set-webhook"), {
           botToken: botTok && !/[•…*]{3,}/.test(botTok) ? botTok : undefined,
           publicUrl: pub || undefined,
         });
-      } catch (e: any) { return { ok: false, error: String(e?.message ?? "خطا در اتصال وبهوک"), status: e?.status ?? 0 }; }
-    }
-    if (name.startsWith("broker:")) {
-      throw new Error("کارگزار CCXT فقط در نسخهٔ ابری فعال است؛ از تب «صرافی‌ها» استفاده کنید.");
-    }
-    if (name === "aiChat:speakText") {
-      throw new Error("تبدیل متن به گفتار در نسخهٔ سرور فعال نیست.");
-    }
+      }
+      if (name.startsWith("broker:")) {
+        throw new Error("کارگزار CCXT فقط در نسخهٔ ابری فعال است؛ از تب «صرافی‌ها» استفاده کنید.");
+      }
+      if (name === "aiChat:speakText") {
+        throw new Error("تبدیل متن به گفتار در نسخهٔ سرور فعال نیست.");
+      }
 
-    if (name.startsWith("adminActions:")) {
-      // historical namespace → telegram/admin bridges handled below
+      const spec = MUTATIONS[name] ?? ROUTES[name];
+      if (!spec) {
+        throw new Error(`عملیات ${name} در سرور تعریف نشده است. (تابع نگاشت‌نشده)`);
+      }
+      const { method, path, body } = resolveSpec(spec, cleanArgs);
+      const isSlow = typeof spec !== "string" && Boolean((spec as any).slow);
+      const timeoutMs = isSlow ? 120_000 : 30_000;
+      const result = await restCall(method, path, method === "GET" ? undefined : (body ?? {}), timeoutMs);
+      bumpAll(); // refetch every mounted query after any write
+      return result;
+    } catch (err: any) {
+      const errMsg = String(err?.message || err || "خطا در اجرای عملیات");
+      toast.error(errMsg);
+      logApiError({
+        endpoint: name,
+        method: "MUTATION",
+        statusCode: (err as any)?.status || 500,
+        responseData: null,
+        error: errMsg,
+      });
+      throw err;
     }
-
-    const spec = MUTATIONS[name] ?? (ROUTES[name] && typeof ROUTES[name] === "object" && (ROUTES[name] as any).m !== "GET" ? ROUTES[name] : null);
-    if (!spec) {
-      throw new Error(`عملیات ${name} در سرور تعریف نشده است. (تابع نگاشت‌نشده)`);
-    }
-    const { method, path, body } = resolveSpec(spec, cleanArgs);
-    const isSlow = typeof spec !== "string" && Boolean((spec as any).slow);
-    const timeoutMs = isSlow ? 120_000 : 30_000;
-    const result = await restCall(method, path, method === "GET" ? undefined : (body ?? {}), timeoutMs);
-    bumpAll(); // refetch every mounted query after any write
-    return result;
   }, [name]);
 }
 
@@ -694,6 +703,7 @@ const MUTATIONS: Record<string, Spec> = {
   "telegram:getWebhookInfo": { m: "GET", p: "/admin/telegram/webhook-info" },
   "nodeCalls:telegramTestBot": { m: "POST", p: "/admin/telegram/send", b: (a) => ({ test: "bot", chatId: a?.chatId, text: a?.text ?? "تست ربات 🐺", ...stripToken(a) }) },
   "nodeCalls:telegramTestChannels": { m: "POST", p: "/admin/telegram/send", b: (a) => ({ test: "channels", text: a?.text ?? "تست کانال‌ها 🐺", ...stripToken(a) }) },
+  "nodeCalls:edgeTtsHealth": { m: "GET", p: "/admin/ai/providers" },
 
   // adminActions → telegram / positions broadcast
   "adminActions:sendSignalToChannel": { m: "POST", p: (a) => a?.id || a?.signalId ? `/admin/signals/${uid(a, "signalId", "id")}/telegram` : "/admin/telegram/send", b: (a) => ({ kind: "signal", text: a?.text, signalId: a?.signalId ?? a?.id, ...stripToken(a) }) },

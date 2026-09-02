@@ -25,7 +25,7 @@ import {
 import { encryptSecret, decryptSecret } from "./util.js";
 import { adapters, paperAdapter, fetchTicker, fetchKlines } from "./exchanges.js";
 import { aiAsk, aiAskJson } from "./ai.js";
-import { handleTelegramUpdate, sendMessage, sendPhoto, setWebhook, getWebhookInfoApi, verifyInitData, miniAppLogin, invalidateTelegramTokenCache, notifyTradeChannel } from "./telegram.js";
+import { handleTelegramUpdate, sendMessage, sendPhoto, setWebhook, getWebhookInfoApi, verifyInitData, miniAppLogin, invalidateTelegramTokenCache, notifyTradeChannel, buildSignalText, fmtPair, sparklineText, fmtNum } from "./telegram.js";
 import { engineTick, closePosition, closeAllPositions, emergencyStop } from "./engine.js";
 import { startPrediction, resolvePrediction, startQuiz, resolveQuiz, buyCoinPackage, unlockSignalDetail, coinPackages } from "./game.js";
 import { runBacktest, runTuner, manualOpen, runResearch } from "./engine-tools.js";
@@ -1598,6 +1598,13 @@ app.post("/api/notifications/read", requireUser, async (c) => {
   return c.json({ ok: true });
 });
 
+app.delete("/api/notifications/:id", requireUser, async (c) => {
+  const u = userOf(c);
+  const id = clean(c.req.param("id"), 100);
+  await pool.query("DELETE FROM notifications WHERE id = $1 AND (user_id = $2 OR $3 = 'admin')", [id, u.id, u.role]);
+  return c.json({ ok: true });
+});
+
 // ── ADMIN: Wolf-coin ledger and vouchers ────────────────────────────────────
 app.get("/api/admin/coins", requireStaff, async (c) => {
   const [ledger, vouchers] = await Promise.all([
@@ -2128,6 +2135,72 @@ app.post("/api/admin/settings/ai-risk-advice", requireAdmin, async (c) => {
   return c.json(r);
 });
 
+// ── MONITOR STATS ────────────────────────────────────────────────────────────
+const getMonitorStatsHandler = async (c: any) => {
+  const settings = await getSettings();
+  const mem = process.memoryUsage();
+  const cpu = process.cpuUsage();
+  const fmtBytes = (b: number) => {
+    const mb = b / (1024 * 1024);
+    return mb >= 1024 ? `${(mb / 1024).toFixed(2)} GB` : `${mb.toFixed(1)} MB`;
+  };
+  const [usersCount, marketsCount, positionsCount, signalsCount] = await Promise.all([
+    one("SELECT COUNT(*) as count FROM users").then((r) => Number(r?.count ?? 0)).catch(() => 0),
+    one("SELECT COUNT(*) as count FROM markets").then((r) => Number(r?.count ?? 0)).catch(() => 0),
+    one("SELECT COUNT(*) as count FROM open_positions").then((r) => Number(r?.count ?? 0)).catch(() => 0),
+    one("SELECT COUNT(*) as count FROM signals").then((r) => Number(r?.count ?? 0)).catch(() => 0),
+  ]);
+  return c.json({
+    ok: true,
+    at: Date.now(),
+    runtime: {
+      node: process.version,
+      platform: process.platform,
+      arch: process.arch,
+      pid: process.pid,
+      uptimeSec: Math.round(process.uptime()),
+      memory: {
+        rss: fmtBytes(mem.rss),
+        heapUsed: fmtBytes(mem.heapUsed),
+        heapTotal: fmtBytes(mem.heapTotal),
+        external: fmtBytes(mem.external),
+      },
+      cpu: { userSec: (cpu.user / 1e6).toFixed(2), systemSec: (cpu.system / 1e6).toFixed(2) },
+    },
+    deployment: {
+      convexUrl: "",
+      siteUrl: String(settings["system.domain"] ?? ""),
+      serverIp: String(settings["system.serverIp"] ?? ""),
+      version: String(settings["engine.version"] ?? "1.0.0"),
+      mode: String(settings["engine.mode"] ?? "demo"),
+      tradeType: String(settings["engine.tradeType"] ?? "futures"),
+      startedAt: Number(settings["engine.startedAt"] ?? 0),
+      lastScanAt: Number(settings["engine.lastScanAt"] ?? 0),
+      engineEnabled: settings["engine.enabled"] !== false,
+      autonomous: settings["engine.autonomous"] !== false,
+      emergencyStop: settings["engine.emergencyStop"] === true,
+      pauseNewTrades: settings["engine.pauseNewTrades"] === true,
+      telegramEnabled: settings["telegram.enabled"] !== false,
+      aiEnabled: settings["ai.enabled"] !== false,
+      health: {
+        tg: String(settings["system.tgHealth"] ?? "ok"),
+        channel: String(settings["system.channelHealth"] ?? "ok"),
+        ai: String(settings["system.aiHealth"] ?? "ok"),
+        exchange: String(settings["system.exchangeHealth"] ?? "ok"),
+      },
+    },
+    counts: {
+      users: usersCount,
+      markets: marketsCount,
+      positions: positionsCount,
+      signals: signalsCount,
+    },
+  });
+};
+
+app.get("/api/monitor/stats", requireAdmin, getMonitorStatsHandler);
+app.get("/monitor/stats", requireAdmin, getMonitorStatsHandler);
+
 // ── ADMIN: emergency + engine ────────────────────────────────────────────────
 app.post("/api/admin/emergency/stop", requireAdmin, async (c) => {
   const admin = userOf(c);
@@ -2135,7 +2208,18 @@ app.post("/api/admin/emergency/stop", requireAdmin, async (c) => {
   const stop = !!body.stop;
   await emergencyStop(stop);
   await audit("emergency_stop", admin.username, admin.id, "engine", { stop });
-  return c.json({ ok: true });
+  const settings = (await getSettings()) as unknown as Record<string, any>;
+  const isStopped = settings["engine.emergencyStop"] === true;
+  const isEngineEnabled = settings["engine.enabled"] !== false;
+  return c.json({
+    ok: true,
+    emergencyStop: isStopped,
+    engineEnabled: isEngineEnabled,
+    status: isStopped ? "EMERGENCY_STOP" : (isEngineEnabled ? "RUNNING" : "STOPPED"),
+    message: isStopped
+      ? "توقف اضطراری فعال شد — تمامی فعالیت‌های موتور به حالت تعلیق درآمد."
+      : "توقف اضطراری لغو شد — فعالیت‌های موتور به حالت عادی بازگشت."
+  });
 });
 
 app.post("/api/admin/emergency/pause", requireAdmin, async (c) => {
@@ -2301,19 +2385,141 @@ app.post("/api/admin/charts/preview", requireAdmin, async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const symbol = clean(body.symbol ?? body.symbolId ?? "BTCUSDT", 20).toUpperCase();
   const tf = clean(body.timeframe ?? body.tf ?? "15m", 8);
-  const candles = await many("SELECT t, o, h, l, c, v FROM candles WHERE symbol = $1 AND timeframe = $2 ORDER BY t ASC LIMIT 100", [symbol, tf]);
-  const pngBase64 = renderCandleChartPng(symbol, tf, candles);
-  return c.json({ ok: true, symbol, timeframe: tf, imageBase64: pngBase64, image: pngBase64 });
+  const lang = body.lang === "en" ? "en" : "fa";
+
+  const entry = body.entry != null ? Number(body.entry) : undefined;
+  const stopLoss = body.stopLoss != null ? Number(body.stopLoss) : (body.stop_loss != null ? Number(body.stop_loss) : undefined);
+  const takeProfit = body.takeProfit != null ? Number(body.takeProfit) : (body.take_profit != null ? Number(body.take_profit) : undefined);
+
+  let candles = await many("SELECT t, o, h, l, c FROM candles WHERE symbol = $1 AND timeframe = $2 ORDER BY t ASC LIMIT 100", [symbol, tf]);
+  if (candles.length === 0) {
+    candles = await many("SELECT t, o, h, l, c FROM candles WHERE symbol = $1 ORDER BY t ASC LIMIT 100", [symbol]);
+  }
+
+  const pngBytes = renderCandleChartPng({
+    symbol,
+    timeframe: tf,
+    candles: candles.map((c) => ({ o: num(c.o), h: num(c.h), l: num(c.l), c: num(c.c), t: num(c.t) })),
+    entry: Number.isFinite(entry) ? entry : undefined,
+    stopLoss: Number.isFinite(stopLoss) ? stopLoss : undefined,
+    takeProfit: Number.isFinite(takeProfit) ? takeProfit : undefined,
+    watermark: "WOLF AI",
+    lang,
+  });
+
+  const pngBase64 = Buffer.from(pngBytes).toString("base64");
+  return c.json({
+    ok: true,
+    symbol,
+    timeframe: tf,
+    pngBase64,
+    imageBase64: pngBase64,
+    image: pngBase64,
+    count: candles.length,
+  });
+});
+
+app.post("/api/admin/chart/preview", requireAdmin, async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const symbol = clean(body.symbol ?? body.symbolId ?? "BTCUSDT", 20).toUpperCase();
+  const tf = clean(body.timeframe ?? body.tf ?? "15m", 8);
+  const lang = body.lang === "en" ? "en" : "fa";
+
+  const entry = body.entry != null ? Number(body.entry) : undefined;
+  const stopLoss = body.stopLoss != null ? Number(body.stopLoss) : (body.stop_loss != null ? Number(body.stop_loss) : undefined);
+  const takeProfit = body.takeProfit != null ? Number(body.takeProfit) : (body.take_profit != null ? Number(body.take_profit) : undefined);
+
+  let candles = await many("SELECT t, o, h, l, c FROM candles WHERE symbol = $1 AND timeframe = $2 ORDER BY t ASC LIMIT 100", [symbol, tf]);
+  if (candles.length === 0) {
+    candles = await many("SELECT t, o, h, l, c FROM candles WHERE symbol = $1 ORDER BY t ASC LIMIT 100", [symbol]);
+  }
+
+  const pngBytes = renderCandleChartPng({
+    symbol,
+    timeframe: tf,
+    candles: candles.map((c) => ({ o: num(c.o), h: num(c.h), l: num(c.l), c: num(c.c), t: num(c.t) })),
+    entry: Number.isFinite(entry) ? entry : undefined,
+    stopLoss: Number.isFinite(stopLoss) ? stopLoss : undefined,
+    takeProfit: Number.isFinite(takeProfit) ? takeProfit : undefined,
+    watermark: "WOLF AI",
+    lang,
+  });
+
+  const pngBase64 = Buffer.from(pngBytes).toString("base64");
+  return c.json({
+    ok: true,
+    symbol,
+    timeframe: tf,
+    pngBase64,
+    imageBase64: pngBase64,
+    image: pngBase64,
+    count: candles.length,
+  });
 });
 
 app.post("/api/admin/signals/:id/telegram", requireAdmin, async (c) => {
   const admin = userOf(c);
   const id = c.req.param("id");
-  const sig = await one("SELECT * FROM signals WHERE id = $1", [id]);
+  const body = await c.req.json().catch(() => ({}));
+  const lang = body.lang === "en" ? "en" : "fa";
+
+  const sig = await one<Row>("SELECT * FROM signals WHERE id = $1", [id]);
   if (!sig) return c.json({ error: "سیگنال یافت نشد." }, 404);
-  await notifyTradeChannel(sig, "signal");
-  await audit("signal_sent_telegram", admin.username, admin.id, "signal", { id, symbol: sig.symbol });
-  return c.json({ ok: true, message: "سیگنال با موفقیت به تلگرام ارسال شد." });
+
+  const s = (await getSettings()) as unknown as Record<string, any>;
+  const botToken = String(s["telegram.token"] ?? "").trim() || config.telegram.token;
+  if (!botToken) {
+    return c.json({ error: "توکن ربات تلگرام تنظیم نشده است. لطفاً در بخش تنظیمات اتصالات وارد کنید." }, 400);
+  }
+
+  const chatId = lang === "en"
+    ? String(s["channel.enId"] || s["telegram.channelEnId"] || s["channel.enUsername"] || s["channel.id"] || s["telegram.channelId"] || s["channel.username"] || s["telegram.channelUsername"] || "").trim()
+    : String(s["channel.id"] || s["telegram.channelId"] || s["channel.username"] || s["telegram.channelUsername"] || "").trim();
+
+  if (!chatId) {
+    return c.json({
+      error: lang === "fa"
+        ? "شناسه یا یوزرنیم کانال تلگرام فارسی تنظیم نشده است."
+        : "English Telegram channel ID/username is not configured."
+    }, 400);
+  }
+
+  const candles = await many("SELECT t, o, h, l, c FROM candles WHERE symbol = $1 AND timeframe = $2 ORDER BY t ASC LIMIT 60", [sig.symbol, sig.timeframe ?? "15m"]);
+  const closes = candles.map((c) => num(c.c));
+
+  const text = (typeof body.text === "string" && body.text.trim())
+    ? body.text.trim()
+    : buildSignalText(sig, lang, closes);
+
+  let photoSent = false;
+  if (candles.length >= 5) {
+    try {
+      const png = renderCandleChartPng({
+        symbol: sig.symbol,
+        timeframe: sig.timeframe ?? "15m",
+        candles: candles.map((c) => ({ o: num(c.o), h: num(c.h), l: num(c.l), c: num(c.c), t: num(c.t) })),
+        entry: num(sig.entry),
+        stopLoss: num(sig.stop_loss ?? sig.stopLoss),
+        takeProfit: num(sig.take_profit ?? sig.takeProfit),
+        watermark: "WOLF AI",
+        lang,
+      });
+      const mid = await sendPhoto(chatId, Buffer.from(png).toString("base64"), `🐺 ${fmtPair(sig.symbol)} ${String(sig.direction ?? sig.side ?? "LONG").toUpperCase()}`);
+      photoSent = !!mid;
+    } catch {
+      /* photo optional */
+    }
+  }
+
+  const mid = await sendMessage(chatId, text, { parseMode: "HTML" });
+  if (!mid && !photoSent) {
+    return c.json({
+      error: "ارسال سیگنال به کانال تلگرام ناموفق بود — اطمینان حاصل کنید ربات به عنوان ادمین در کانال عضو است."
+    }, 400);
+  }
+
+  await audit("signal_sent_telegram", admin.username, admin.id, "signal", { id, symbol: sig.symbol, lang });
+  return c.json({ ok: true, message: "سیگنال با موفقیت به تلگرام ارسال شد.", messageId: mid });
 });
 
 // ── ADMIN: engine tools (backtest / tuner / research / manual open) ─────────
@@ -2820,6 +3026,25 @@ app.patch("/api/admin/support/tickets/:id", requireAdmin, async (c) => {
   return c.json({ ok: true });
 });
 
+app.delete("/api/admin/support/tickets/:id", requireAdmin, async (c) => {
+  const id = c.req.param("id");
+  await tx(async (c2) => {
+    await c2.query("DELETE FROM support_messages WHERE ticket_id = $1", [id]);
+    await c2.query("DELETE FROM support_tickets WHERE id = $1", [id]);
+  });
+  return c.json({ ok: true });
+});
+
+app.delete("/api/support/tickets/:id", requireUser, async (c) => {
+  const u = userOf(c);
+  const id = c.req.param("id");
+  await tx(async (c2) => {
+    await c2.query("DELETE FROM support_messages WHERE ticket_id = $1 AND ticket_id IN (SELECT id FROM support_tickets WHERE id = $1 AND user_id = $2)", [id, u.id]);
+    await c2.query("DELETE FROM support_tickets WHERE id = $1 AND user_id = $2", [id, u.id]);
+  });
+  return c.json({ ok: true });
+});
+
 
 app.post("/api/admin/support/tickets/:id/reply", requireAdmin, async (c) => {
   const admin = userOf(c);
@@ -3203,8 +3428,24 @@ app.post("/api/admin/positions/:id/telegram", requireAdmin, async (c) => {
 app.post("/api/admin/telegram/send", requireAdmin, async (c) => {
   const admin = userOf(c);
   const body = await c.req.json().catch(() => ({}));
-  const text = clean(body.text, 4000);
-  if (!text) return c.json({ error: "message_required" }, 400);
+  let text = clean(body.text, 4000);
+  const lang = body.lang === "en" ? "en" : "fa";
+
+  // Auto-generate signal text if missing and a signalId/id is provided or kind === "signal"
+  if (!text && (body.signalId || body.id || body.kind === "signal")) {
+    const sigId = body.signalId || body.id;
+    if (sigId) {
+      const sig = await one<Row>("SELECT * FROM signals WHERE id = $1", [sigId]);
+      if (sig) {
+        const candles = await many("SELECT c FROM candles WHERE symbol = $1 AND timeframe = $2 ORDER BY t ASC LIMIT 60", [sig.symbol, sig.timeframe ?? "15m"]);
+        text = buildSignalText(sig, lang, candles.map((c) => num(c.c)));
+      }
+    }
+  }
+
+  if (!text && body.test !== "bot" && body.test !== "channels") {
+    return c.json({ error: "message_required", message: "متن پیام یا آی‌دی سیگنال الزامی است." }, 400);
+  }
   const s = (await getSettings()) as unknown as Record<string, any>;
   // Test mode "bot": send to the owner admin id configured in settings.
   if (body.test === "bot") {

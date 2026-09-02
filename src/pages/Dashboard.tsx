@@ -52,7 +52,7 @@ import { LangToggle, useI18n } from "@/lib/i18n";
 import { useAction as useConvexAction, useMutation as useConvexMutation, useQuery as useConvexQuery } from "convex/react";
 import { getFunctionName } from "convex/server";
 import { BACKEND } from "@/lib/backend";
-import { useRestQuery, useRestMutation } from "@/lib/restApi";
+import { useRestQuery, useRestMutation, bumpAll } from "@/lib/restApi";
 import {
   Activity,
   BarChart3,
@@ -4479,6 +4479,34 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
       setMonBusy(false);
     }
   };
+
+  const doEmergencyStopToggle = async (stop: boolean) => {
+    try {
+      const res: any = await emergencyStop({ token, stop });
+      // Unified state refresh: refetch engine monitor & system settings
+      await doMonitor();
+      bumpAll();
+
+      const isStopped = res?.emergencyStop ?? stop;
+      if (isStopped) {
+        toast.error(
+          res?.message ||
+            (lang === "fa"
+              ? "⚠️ توقف اضطراری فعال شد — تمامی فعالیت‌های موتور به حالت تعلیق درآمد."
+              : "⚠️ Emergency stop activated — Engine halted instantly.")
+        );
+      } else {
+        toast.success(
+          res?.message ||
+            (lang === "fa"
+              ? "✅ توقف اضطراری لغو شد — فعالیت‌های موتور به حالت عادی بازگشت."
+              : "✅ Emergency stop released — Engine resumed normal operations.")
+        );
+      }
+    } catch (e: any) {
+      toast.error(String(e?.message ?? e));
+    }
+  };
   useEffect(() => {
     void doMonitor();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -5025,7 +5053,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
               size="sm"
               variant={cfg["engine.emergencyStop"] ? "destructive" : "outline"}
               className="h-8 gap-1 text-xs border-red-400/40 text-red-300 hover:bg-red-400/10"
-              onClick={() => doToggle("engine.emergencyStop", !cfg["engine.emergencyStop"])}
+              onClick={() => doEmergencyStopToggle(!cfg["engine.emergencyStop"])}
             >
               <AlertTriangle className="size-3.5" />
               {cfg["engine.emergencyStop"] ? (lang === "fa" ? "اورژانسی فعال" : "Stop Active") : s.stopTrading}
@@ -5161,7 +5189,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
                 variant={cfg["engine.emergencyStop"] ? "default" : "destructive"}
                 size="sm"
                 className="gap-1.5"
-                onClick={() => emergencyStop({ token, stop: !cfg["engine.emergencyStop"] }).then(() => toast.success(s.saved)).catch((e: any) => toast.error(String(e?.message)))}
+                onClick={() => doEmergencyStopToggle(!cfg["engine.emergencyStop"])}
               >
                 <AlertTriangle className="size-3.5" /> {s.emergencyStop}
               </Button>
@@ -7475,7 +7503,7 @@ function AdminPanel({ token, readOnly = false }: { token: string; readOnly?: boo
               variant={mon?.deployment?.emergencyStop ? "default" : "destructive"}
               className="gap-1.5"
               title={lang === "fa" ? "توقف اضطراری: موتور فوراً می‌ایستد — هیچ اسکن و معامله‌ای تا خاموش شدن دوباره اجرا نمی‌شود" : "Emergency stop: the engine halts instantly — no scans or trades until turned off"}
-              onClick={() => emergencyStop({ token, stop: !mon?.deployment?.emergencyStop }).then(() => { doMonitor(); toast.success(s.saved); }).catch((e: any) => toast.error(String(e?.message)))}
+              onClick={() => doEmergencyStopToggle(!mon?.deployment?.emergencyStop)}
             >
               <AlertTriangle className="size-3.5" /> {s.emergencyStop}
             </Button>

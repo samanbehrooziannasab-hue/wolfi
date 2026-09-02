@@ -422,28 +422,169 @@ export async function handleTelegramUpdate(update: any): Promise<void> {
 }
 
 // ── Trade alert to channel (with "view details" Mini App button) ────────────
+export function fmtPair(symbol: string): string {
+  const s = String(symbol ?? "").trim().toUpperCase();
+  if (!s) return String(symbol ?? "");
+  if (s.includes("/")) return s;
+  const quotes = ["USDT", "USD", "JPY", "GBP", "EUR", "CHF", "CAD", "AUD", "NZD", "TRY", "ZAR"];
+  for (const q of [...quotes].sort((a, b) => b.length - a.length)) {
+    if (s.length > q.length && s.endsWith(q)) return `${s.slice(0, -q.length)}/${q}`;
+  }
+  return s;
+}
+
+export function sparklineText(closes: number[] | null | undefined): string {
+  const cs = Array.isArray(closes) ? closes.slice(-28).filter((n) => Number.isFinite(n)) : [];
+  if (cs.length < 2) return "";
+  const chars: string[] = [];
+  for (let i = 1; i < cs.length; i++) {
+    chars.push(cs[i] >= cs[i - 1] ? "🟩" : "🟥");
+  }
+  return chars.join("");
+}
+
+export function fmtNum(n: number | undefined | null, digits = 5): string {
+  const v = Number(n ?? 0);
+  if (!Number.isFinite(v)) return "—";
+  return v >= 1000 ? v.toFixed(2) : v.toFixed(digits);
+}
+
+export function buildSignalText(sig: Row, lang: "fa" | "en" = "fa", closes: number[] = []): string {
+  const symbol = String(sig.symbol ?? "MARKET").toUpperCase();
+  const rawDir = String(sig.direction ?? sig.side ?? "long").toLowerCase();
+  const dir = rawDir === "short" ? "SHORT" : "LONG";
+  const pair = fmtPair(symbol);
+  const timeframe = String(sig.timeframe ?? sig.tf ?? "15m");
+  const entry = num(sig.entry);
+  const stopLoss = num(sig.stop_loss ?? sig.stopLoss);
+  const takeProfit = num(sig.take_profit ?? sig.takeProfit);
+
+  let targets: number[] = [];
+  if (Array.isArray(sig.targets)) {
+    targets = sig.targets.map(num).filter(Number.isFinite);
+  } else if (typeof sig.targets === "string") {
+    try {
+      const parsed = JSON.parse(sig.targets);
+      if (Array.isArray(parsed)) targets = parsed.map(num).filter(Number.isFinite);
+    } catch {
+      /* ignore */
+    }
+  }
+  if (targets.length === 0 && Number.isFinite(takeProfit) && takeProfit > 0) {
+    targets = [takeProfit];
+  }
+
+  const score = Math.round(num(sig.score ?? 80));
+  const confRaw = num(sig.confidence ?? 0.8);
+  const confidence = Math.round(confRaw <= 1 ? confRaw * 100 : confRaw);
+  const rrRaw = num(sig.rr);
+  const rr = rrRaw > 0 ? rrRaw : Math.abs(takeProfit - entry) / (Math.abs(entry - stopLoss) || 1);
+  const price = num(sig.price);
+
+  let reasons: string[] = [];
+  const rawReasons = lang === "fa" ? (sig.reasons_fa ?? sig.reasonsFa ?? sig.reasons) : (sig.reasons_en ?? sig.reasonsEn ?? sig.reasons_fa ?? sig.reasons);
+  if (Array.isArray(rawReasons)) {
+    reasons = rawReasons.map(String).filter(Boolean);
+  } else if (typeof rawReasons === "string") {
+    try {
+      const parsed = JSON.parse(rawReasons);
+      if (Array.isArray(parsed)) reasons = parsed.map(String).filter(Boolean);
+      else reasons = [rawReasons];
+    } catch {
+      reasons = [rawReasons];
+    }
+  }
+  if (reasons.length === 0 && sig.strategy_keys) {
+    const keys = Array.isArray(sig.strategy_keys) ? sig.strategy_keys : [sig.strategy_keys];
+    reasons = keys.map(String);
+  }
+
+  const lines: string[] = [];
+  if (lang === "fa") {
+    lines.push(`🐺 <b>سیگنال Trading Wolf AI</b>`);
+    lines.push(`<b>${pair}</b> · ${dir} · ${timeframe}`);
+    lines.push(`\n📍 ورود: <code>${fmtNum(entry)}</code>`);
+    lines.push(`🛑 حد ضرر: <code>${fmtNum(stopLoss)}</code>`);
+    lines.push(`🎯 هدف اصلی: <code>${fmtNum(takeProfit)}</code>`);
+    if (targets.length > 1) {
+      lines.push(`   اهداف: ${targets.map((t) => `<code>${fmtNum(t)}</code>`).join(" · ")}`);
+    }
+    lines.push(`\n📊 امتیاز: <b>${score}</b>/100 · اطمینان: <b>${confidence}%</b> · R/R: <b>${rr.toFixed(2)}</b>`);
+    if (price > 0) lines.push(`💵 قیمت لحظه‌ای: <code>${fmtNum(price)}</code>`);
+    if (reasons.length > 0) {
+      lines.push(`\n💡 دلایل و استراتژی‌ها:\n${reasons.slice(0, 5).map((r) => `• ${r}`).join("\n")}`);
+    }
+    const sp = sparklineText(closes);
+    if (sp) lines.push(`\n${sp}`);
+    lines.push(`\n#${symbol} #${dir.toLowerCase()} #${timeframe.replace(/[^a-z0-9]/gi, "")} #wolf_ai #signal`);
+    if (sig.id) lines.push(`🆔 شناسه: <code>${String(sig.id).slice(-10)}</code>`);
+    lines.push(`\n⚠️ صرفاً جنبه آموزشی دارد — هرگز توصیه مالی نیست.`);
+  } else {
+    lines.push(`🐺 <b>Trading Wolf AI Signal</b>`);
+    lines.push(`<b>${pair}</b> · ${dir} · ${timeframe}`);
+    lines.push(`\n📍 Entry: <code>${fmtNum(entry)}</code>`);
+    lines.push(`🛑 Stop loss: <code>${fmtNum(stopLoss)}</code>`);
+    lines.push(`🎯 Target: <code>${fmtNum(takeProfit)}</code>`);
+    if (targets.length > 1) {
+      lines.push(`   Targets: ${targets.map((t) => `<code>${fmtNum(t)}</code>`).join(" · ")}`);
+    }
+    lines.push(`\n📊 Score: <b>${score}</b>/100 · Confidence: <b>${confidence}%</b> · R/R: <b>${rr.toFixed(2)}</b>`);
+    if (price > 0) lines.push(`💵 Live price: <code>${fmtNum(price)}</code>`);
+    if (reasons.length > 0) {
+      lines.push(`\n💡 Reasons & Strategies:\n${reasons.slice(0, 5).map((r) => `• ${r}`).join("\n")}`);
+    }
+    const sp = sparklineText(closes);
+    if (sp) lines.push(`\n${sp}`);
+    lines.push(`\n#${symbol} #${dir.toLowerCase()} #${timeframe.replace(/[^a-z0-9]/gi, "")} #wolf_ai #signal`);
+    if (sig.id) lines.push(`🆔 ID: <code>${String(sig.id).slice(-10)}</code>`);
+    lines.push(`\n⚠️ Educational only — never financial advice.`);
+  }
+  return lines.join("\n");
+}
+
 export async function notifyTradeChannel(
   p: Row,
-  mode: "open" | "close" | "signal"
+  mode: "open" | "close" | "signal",
+  lang: "fa" | "en" = "fa"
 ): Promise<void> {
-  const channelId = config.telegram.channelId || ((await getSettings()) as any)?.["channel.id"] || "";
+  const s = ((await getSettings()) as any) ?? {};
+  const channelId = lang === "en"
+    ? String(s["channel.enId"] || s["telegram.channelEnId"] || s["channel.enUsername"] || s["channel.id"] || s["telegram.channelId"] || config.telegram.channelId || "").trim()
+    : String(s["channel.id"] || s["telegram.channelId"] || s["channel.username"] || s["telegram.channelUsername"] || config.telegram.channelId || "").trim();
   if (!channelId || !(await resolveToken())) return;
+
+  if (mode === "signal") {
+    const text = buildSignalText(p, lang);
+    await sendMessage(channelId, text, {
+      parseMode: "HTML",
+      replyMarkup: {
+        inline_keyboard: [
+          [{ text: lang === "fa" ? "🔎 مشاهده جزئیات" : "🔎 View Details", web_app: { url: config.telegram.miniAppUrl || config.appUrl } }],
+        ],
+      },
+    });
+    return;
+  }
+
   const side = p.side === "long" ? "🟢 لانگ / LONG" : "🔴 شورت / SHORT";
-  const emoji = mode === "open" ? "📌 معامله باز شد" : mode === "close" ? "✅ معامله بسته شد" : "📡 سیگنال";
+  const emoji = mode === "open" ? "📌 معامله باز شد" : "✅ معامله بسته شد";
+  const stopLoss = num(p.stop_loss ?? p.stopLoss);
+  const takeProfit = num(p.take_profit ?? p.takeProfit);
+  const entry = num(p.entry);
   const lines = [
     emoji,
     "━━━━━━━━━━━━━━━━━━",
-    `📊 نماد: <b>${p.symbol}</b>`,
+    `📊 نماد: <b>${fmtPair(p.symbol)}</b>`,
     side,
-    `⭐ Score: <b>${num(p.score).toFixed(1)}</b>/100 | Confidence: ${Math.round(num(p.confidence) * 100)}%`,
-    `🧠 استراتژی: ${(p.strategyKeys ?? []).slice(0, 3).join(" · ") || "-"}`,
-    `📥 ورود: ${p.entry}`,
-    `⛔ حد ضرر: ${p.stopLoss}`,
-    `🎯 هدف: ${p.takeProfit}`,
+    `⭐ Score: <b>${num(p.score).toFixed(1)}</b>/100 | Confidence: ${Math.round(num(p.confidence) * (num(p.confidence) <= 1 ? 100 : 1))}%`,
+    `🧠 استراتژی: ${(p.strategyKeys ?? p.strategy_keys ?? []).slice(0, 3).join(" · ") || "-"}`,
+    `📥 ورود: ${fmtNum(entry)}`,
+    `⛔ حد ضرر: ${fmtNum(stopLoss)}`,
+    `🎯 هدف: ${fmtNum(takeProfit)}`,
   ];
   if (mode === "close") {
-    lines.push(`💰 نتیجه: <b>${num(p.profit) >= 0 ? "+" : ""}${num(p.profit).toFixed(4)} USDT</b>`);
-    lines.push(`📌 دلیل خروج: ${p.closeReason ?? "-"}`);
+    lines.push(`💰 نتیجه: <b>${num(p.profit) >= 0 ? "+" : ""}${fmtNum(p.profit, 4)} USDT</b>`);
+    lines.push(`📌 دلیل خروج: ${p.closeReason ?? p.close_reason ?? "-"}`);
   }
   lines.push("━━━━━━━━━━━━━━━━━━");
   lines.push("#WOLF_TRADE");
